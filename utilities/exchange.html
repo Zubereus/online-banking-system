@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8" />
+	<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+	<title>Exchange Rates Utility</title>
+	<link rel="preconnect" href="https://fonts.googleapis.com" />
+	<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+	<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=Manrope:wght@500;700;800&display=swap" rel="stylesheet" />
+	<link rel="stylesheet" href="../styles.css" />
+	<script src="../auth-watchdog.js"></script>
+	<script>
+		if (sessionStorage.getItem("vcbAuthenticated") !== "true") {
+			location.replace("../index.html");
+		}
+	</script>
+</head>
+<body>
+	<div class="orb one"></div>
+	<div class="orb two"></div>
+
+	<main class="card">
+		<header class="topbar" id="topbar">
+			<div class="brand">Utility: Exchange Rates</div>
+			<button class="menu-toggle" id="menuToggle" aria-label="Toggle menu" aria-expanded="false" aria-controls="dropdownMenu">
+				<span class="menu-icon" aria-hidden="true">
+					<span></span>
+					<span></span>
+					<span></span>
+				</span>
+			</button>
+			<nav class="dropdown" id="dropdownMenu" aria-label="Main menu">
+				<a href="../home.html">Home</a>
+				<a href="index.html">Utilities</a>
+				<a href="weather.html">Weather Utility</a>
+				<a href="exchange.html">Exchange Utility</a>
+				<a href="stock.html">Stock Monitor</a>
+				<a href="loan-emi.html">Loan EMI</a>
+			</nav>
+		</header>
+
+		<section class="hero">
+			<span class="badge">Live Utility</span>
+			<h1>Exchange Rates</h1>
+			<p>Convert between currencies with live rates for travel, trade, and spending estimates.</p>
+		</section>
+
+		<section class="grid exchange-grid">
+			<article class="panel big">
+				<h2>Currency Converter</h2>
+				<p class="muted">Common codes: USD, EUR, GBP, JPY, VND, SGD</p>
+				<form id="exchangeForm" class="exchange-form">
+					<input id="amountInput" class="exchange-input" type="number" min="0" step="0.01" value="1" required />
+					<input id="fromInput" class="exchange-input code" type="text" value="USD" maxlength="3" required />
+					<input id="toInput" class="exchange-input code" type="text" value="VND" maxlength="3" required />
+					<div class="exchange-actions">
+						<button class="primary" type="submit">Convert</button>
+						<button id="swapBtn" class="secondary" type="button">Swap Currencies</button>
+					</div>
+				</form>
+				<div class="exchange-output" id="exchangeOutput">Enter amount and currencies, then press Convert.</div>
+			</article>
+
+			<article class="panel small">
+				<h2>Quick Pairs</h2>
+				<p class="muted">Tap to load pair fast:</p>
+				<div class="exchange-quicklist" id="exchangeQuicklist">
+					<button class="secondary exchange-chip" type="button" data-from="USD" data-to="VND">USD/VND</button>
+					<button class="secondary exchange-chip" type="button" data-from="EUR" data-to="VND">EUR/VND</button>
+					<button class="secondary exchange-chip" type="button" data-from="JPY" data-to="VND">JPY/VND</button>
+					<button class="secondary exchange-chip" type="button" data-from="USD" data-to="JPY">USD/JPY</button>
+					<button class="secondary exchange-chip" type="button" data-from="GBP" data-to="USD">GBP/USD</button>
+				</div>
+			</article>
+		</section>
+	</main>
+
+	<script>
+		const topbar = document.getElementById("topbar");
+		const menuToggle = document.getElementById("menuToggle");
+		const exchangeForm = document.getElementById("exchangeForm");
+		const amountInput = document.getElementById("amountInput");
+		const fromInput = document.getElementById("fromInput");
+		const toInput = document.getElementById("toInput");
+		const swapBtn = document.getElementById("swapBtn");
+		const exchangeOutput = document.getElementById("exchangeOutput");
+		const exchangeQuicklist = document.getElementById("exchangeQuicklist");
+		const apiBase = window.location.origin.startsWith("http")
+			? `${window.location.origin}/api`
+			: "http://localhost:8080/api";
+		const cccd = sessionStorage.getItem("vcbCCCD") || "";
+
+		window.VCBSessionWatchdog.start({
+			intervalMs: 15000,
+			onInvalid: () => {
+				window.VCBSessionWatchdog.clearCustomerSession();
+				window.location.replace("../index.html");
+			},
+			validator: async () => {
+				if (!cccd) {
+					return false;
+				}
+
+				const healthResponse = await window.VCBSessionWatchdog.fetchWithTimeout(`${apiBase}/health`, {
+					cache: "no-store"
+				});
+				if (!healthResponse.ok) {
+					return false;
+				}
+
+				const accountResponse = await window.VCBSessionWatchdog.fetchWithTimeout(
+					`${apiBase}/accounts?cccd=${encodeURIComponent(cccd)}`,
+					{ cache: "no-store" }
+				);
+				if (!accountResponse.ok) {
+					return false;
+				}
+
+				const accounts = await accountResponse.json();
+				return Array.isArray(accounts) && accounts.length > 0;
+			}
+		});
+
+		menuToggle.addEventListener("click", () => {
+			const isOpen = topbar.classList.toggle("menu-open");
+			menuToggle.setAttribute("aria-expanded", String(isOpen));
+		});
+
+		document.addEventListener("click", (event) => {
+			if (!topbar.contains(event.target)) {
+				topbar.classList.remove("menu-open");
+				menuToggle.setAttribute("aria-expanded", "false");
+			}
+		});
+
+		function normalizeCode(value) {
+			return String(value || "").trim().toUpperCase();
+		}
+
+		async function convertCurrency() {
+			const amount = Number(amountInput.value);
+			const from = normalizeCode(fromInput.value);
+			const to = normalizeCode(toInput.value);
+
+			if (!amount || amount <= 0) {
+				throw new Error("Amount must be greater than 0.");
+			}
+			if (from.length !== 3 || to.length !== 3) {
+				throw new Error("Currency codes must be 3 letters (for example USD, EUR, VND).");
+			}
+
+			const url =
+				"https://open.er-api.com/v6/latest/" +
+				encodeURIComponent(from);
+
+			const response = await fetch(url);
+			if (!response.ok) {
+				throw new Error("Unable to fetch exchange rates right now.");
+			}
+
+			const data = await response.json();
+			if (!data || data.result !== "success") {
+				throw new Error("Exchange provider is temporarily unavailable.");
+			}
+
+			if (!data.rates || typeof data.rates[to] !== "number") {
+				throw new Error("No rate available for this currency pair.");
+			}
+
+			const converted = amount * data.rates[to];
+			exchangeOutput.innerHTML =
+				"<strong>" + amount.toLocaleString() + " " + from + " = " + converted.toLocaleString(undefined, { maximumFractionDigits: 4 }) + " " + to + "</strong><br>" +
+				"Rate updated: " + (data.time_last_update_utc || "N/A") + "<br>" +
+				"Source: ExchangeRate-API (open.er-api.com).";
+		}
+
+		exchangeForm.addEventListener("submit", async (event) => {
+			event.preventDefault();
+			exchangeOutput.textContent = "Loading rate...";
+			try {
+				await convertCurrency();
+			} catch (error) {
+				exchangeOutput.textContent = error.message;
+			}
+		});
+
+		swapBtn.addEventListener("click", () => {
+			const currentFrom = fromInput.value;
+			fromInput.value = toInput.value;
+			toInput.value = currentFrom;
+		});
+
+		exchangeQuicklist.addEventListener("click", (event) => {
+			const target = event.target.closest(".exchange-chip");
+			if (!target) {
+				return;
+			}
+
+			fromInput.value = target.getAttribute("data-from") || "USD";
+			toInput.value = target.getAttribute("data-to") || "VND";
+		});
+	</script>
+</body>
+</html>

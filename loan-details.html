@@ -1,0 +1,514 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8" />
+	<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+	<title>Vietcombank | Loan Status & Remaining Debt</title>
+	<link rel="preconnect" href="https://fonts.googleapis.com" />
+	<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+	<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=Manrope:wght@500;700;800&display=swap" rel="stylesheet" />
+	<link rel="stylesheet" href="styles.css" />
+	<script src="auth-watchdog.js"></script>
+	<script>
+		if (sessionStorage.getItem("vcbAuthenticated") !== "true" && sessionStorage.getItem("vcbAdminAuthenticated") !== "true") {
+			location.replace("index.html");
+		}
+	</script>
+</head>
+<body class="home-page">
+	<div class="home-shell home-main-shell" id="top">
+		<header class="home-topbar">
+			<div class="home-brand">
+				<div class="home-logo-frame">
+					<img src="assets/logo-vietcombank.png" alt="Vietcombank logo" />
+				</div>
+				<div class="home-brand-copy">
+					<strong>Vietcombank</strong>
+					<span>Personal banking made simple</span>
+				</div>
+			</div>
+			<nav class="home-nav" aria-label="Primary navigation">
+				<a href="home.html">Back to home</a>
+				<button class="home-nav-button" id="logoutBtn" type="button">Logout</button>
+			</nav>
+		</header>
+
+		<section class="hero-panel">
+			<div class="hero-copy">
+				<h1 class="reveal-block intro-block" style="--delay: 90ms;">Your Loan Details</h1>
+				<p class="reveal-block intro-block" style="--delay: 180ms;">View all your loans and remaining debt</p>
+			</div>
+		</section>
+
+		<section class="db-grid">
+			<article class="db-card reveal-block" style="--delay: 120ms;">
+				<h3 style="margin-top: 0;">Loan Information</h3>
+
+				<div id="loansContainer" style="display: none;">
+					<div id="loansStatus" class="action-status ok" style="margin-bottom: 1rem;"></div>
+					
+					<!-- Tabs to switch between views -->
+					<div style="display: flex; gap: 1rem; margin-bottom: 1.5rem; border-bottom: 2px solid #ddd;">
+						<button class="tab-button" id="tab-default" style="padding: 0.5rem 1rem; border: none; background: none; cursor: pointer; font-weight: 600; color: #0066cc; border-bottom: 2px solid #0066cc;">Loans Table</button>
+						<button class="tab-button" id="tab-statistics" style="padding: 0.5rem 1rem; border: none; background: none; cursor: pointer; color: #999; font-weight: 600;">Statistics (Procedure)</button>
+					</div>
+
+					<!-- Default view: TinhDuNoConLai function -->
+					<div id="defaultView" style="display: none;">
+						<div id="loansTable" style="overflow-x: auto; margin-bottom: 2rem;">
+							<!-- Loans table will be rendered here -->
+						</div>
+					</div>
+
+					<!-- Statistics view: ThongKeDuNoKhoanVay procedure -->
+					<div id="statisticsView" style="display: none;">
+						<div style="display: flex; gap: 1rem; align-items: center; margin-bottom: 1rem;">
+							<label style="display:flex; align-items:center; gap:0.5rem;">
+								<span>Status:</span>
+								<select id="statStatusSelect">
+									<option value="">All</option>
+									<option value="Hoat_dong">Active</option>
+									<option value="Qua_han">Overdue</option>
+									<option value="Da_thanh_toan">Paid Off</option>
+								</select>
+							</label>
+							<label style="display:flex; align-items:center; gap:0.5rem;">
+								<span>Min paid (VND):</span>
+								<input id="statMinPaidInput" type="number" min="0" value="0" style="width:140px;" />
+							</label>
+							<button id="runStatsBtn" type="button" class="home-button secondary">Run</button>
+							<p id="statStatusMsg" style="margin:0; color:#666; font-size:0.95rem;"></p>
+						</div>
+						<div id="statisticsTable" style="overflow-x: auto; margin-bottom: 2rem;">
+							<!-- Statistics table will be rendered here -->
+						</div>
+					</div>
+
+					<div id="adminTools" style="display: none; margin: 0 0 1.5rem; padding: 1.25rem; border: 1px solid #d7e3f4; border-radius: 12px; background: #f8fbff;">
+						<h4 style="margin: 0 0 1rem;">Loan Management Procedures</h4>
+						<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 0.9rem; align-items: end;">
+							<label style="display: flex; flex-direction: column; gap: 0.35rem;">
+								<span>Loan ID</span>
+								<input id="adminLoanId" type="text" placeholder="KV00000000" />
+							</label>
+							<label style="display: flex; flex-direction: column; gap: 0.35rem;">
+								<span>Interest rate</span>
+								<input id="adminInterestRate" type="number" step="0.0001" min="0" max="0.2" placeholder="0.01" />
+							</label>
+							<label style="display: flex; flex-direction: column; gap: 0.35rem;">
+								<span>Term months</span>
+								<input id="adminTermMonths" type="number" min="1" placeholder="60" />
+							</label>
+							<label style="display: flex; flex-direction: column; gap: 0.35rem;">
+								<span>Principal cycle</span>
+								<input id="adminPrincipalCycle" type="number" min="1" placeholder="12" />
+							</label>
+							<label style="display: flex; flex-direction: column; gap: 0.35rem;">
+								<span>Status</span>
+								<select id="adminLoanStatusSelect">
+									<option value="">Keep current</option>
+									<option value="Hoat_dong">Hoat_dong</option>
+									<option value="Qua_han">Qua_han</option>
+									<option value="Da_thanh_toan">Da_thanh_toan</option>
+								</select>
+							</label>
+						</div>
+						<div style="display: flex; gap: 0.75rem; flex-wrap: wrap; margin-top: 0.9rem;">
+							<button type="button" class="home-nav-button" id="loadLoanBtn">Load selected loan</button>
+							<button type="button" class="home-nav-button" id="updateLoanBtn">Update loan</button>
+							<button type="button" class="home-nav-button" id="deleteLoanBtn">Delete loan</button>
+							<button type="button" class="home-nav-button" id="clearLoanFormBtn">Clear</button>
+						</div>
+						<p id="adminLoanStatus" class="action-status" style="margin: 0.9rem 0 0; display: none;"></p>
+					</div>
+
+					<div style="display: flex; gap: 1rem; flex-wrap: wrap;">
+						<a href="create-loan.html" class="home-button primary" style="flex: 1 1 auto;">Apply for New Loan</a>
+						<button type="button" class="home-button secondary" id="refreshBtn" style="flex: 1 1 auto;">Refresh</button>
+					</div>
+				</div>
+
+				<div id="noLoansContainer" style="display: none; padding: 2rem; text-align: center;">
+					<p style="font-size: 1.1rem; color: #666; margin-bottom: 2rem;">
+						You don't have any loans. Apply for a new loan to get started.
+					</p>
+					<a href="create-loan.html" class="home-button primary">Apply for a Loan</a>
+				</div>
+
+				<div id="loadingContainer" style="display: none; text-align: center; padding: 2rem;">
+					<p>Loading your loans...</p>
+				</div>
+
+				<div id="errorContainer" style="display: none; padding: 2rem; background: #ffebee; border-radius: 8px;">
+					<p id="errorMessage" style="color: #f44336; margin: 0;"></p>
+					<button type="button" class="home-button secondary" id="retryBtn" style="margin-top: 1rem;">Try Again</button>
+				</div>
+			</article>
+		</section>
+
+		<div class="footer-strip credits-strip reveal-block" style="--delay: 520ms;">
+			<div class="credits-heading">
+				<img class="credits-icon" src="assets/Icon-Vietcombank.png" alt="Vietcombank icon" />
+				<span class="credits-title">Database Major Assignment 2</span>
+			</div>
+		</div>
+	</div>
+
+	<script>
+		window.addEventListener("load", () => {
+			document.body.classList.add("home-ready");
+
+			const isCustomerSession = sessionStorage.getItem("vcbAuthenticated") === "true";
+			const isAdminSession = sessionStorage.getItem("vcbAdminAuthenticated") === "true";
+
+			const apiBase = window.location.origin.startsWith("http")
+				? `${window.location.origin}/api`
+				: "http://localhost:8080/api";
+
+			const logoutBtn = document.getElementById("logoutBtn");
+			const loansContainer = document.getElementById("loansContainer");
+			const noLoansContainer = document.getElementById("noLoansContainer");
+			const loadingContainer = document.getElementById("loadingContainer");
+			const errorContainer = document.getElementById("errorContainer");
+			const loansStatus = document.getElementById("loansStatus");
+			const loansTable = document.getElementById("loansTable");
+			const statisticsTable = document.getElementById("statisticsTable");
+			const statStatusSelect = document.getElementById("statStatusSelect");
+			const statMinPaidInput = document.getElementById("statMinPaidInput");
+			const runStatsBtn = document.getElementById("runStatsBtn");
+			const statStatusMsg = document.getElementById("statStatusMsg");
+			const adminTools = document.getElementById("adminTools");
+			const adminLoanId = document.getElementById("adminLoanId");
+			const adminInterestRate = document.getElementById("adminInterestRate");
+			const adminTermMonths = document.getElementById("adminTermMonths");
+			const adminPrincipalCycle = document.getElementById("adminPrincipalCycle");
+			const adminLoanStatus = document.getElementById("adminLoanStatus");
+			const adminLoanStatusSelect = document.getElementById("adminLoanStatusSelect");
+			const loadLoanBtn = document.getElementById("loadLoanBtn");
+			const updateLoanBtn = document.getElementById("updateLoanBtn");
+			const deleteLoanBtn = document.getElementById("deleteLoanBtn");
+			const clearLoanFormBtn = document.getElementById("clearLoanFormBtn");
+			const errorMessage = document.getElementById("errorMessage");
+			const refreshBtn = document.getElementById("refreshBtn");
+			const retryBtn = document.getElementById("retryBtn");
+			const tabDefault = document.getElementById("tab-default");
+			const tabStatistics = document.getElementById("tab-statistics");
+			const defaultView = document.getElementById("defaultView");
+			const statisticsView = document.getElementById("statisticsView");
+
+			let currentView = "default"; // Track current view
+
+			const invalidateSession = () => {
+				if (isAdminSession) {
+					window.VCBSessionWatchdog.clearAdminSession();
+				} else {
+					window.VCBSessionWatchdog.clearCustomerSession();
+				}
+				window.location.replace("index.html");
+			};
+
+			logoutBtn.addEventListener("click", () => {
+				if (isAdminSession) {
+					window.VCBSessionWatchdog.clearAdminSession();
+				} else {
+					window.VCBSessionWatchdog.clearCustomerSession();
+				}
+				window.location.replace("index.html");
+			});
+
+			const formatMoney = (value) => {
+				return new Intl.NumberFormat("vi-VN", { maximumFractionDigits: 0 }).format(Number(value || 0));
+			};
+
+			const getStatusBadge = (status) => {
+				const statusMap = {
+					"Hoat_dong": { label: "Active", color: "#4caf50" },
+					"Qua_han": { label: "Overdue", color: "#ff9800" },
+					"Da_thanh_toan": { label: "Paid Off", color: "#2196f3" }
+				};
+				const info = statusMap[status] || { label: status, color: "#999" };
+				return `<span style="background: ${info.color}; color: white; padding: 0.25rem 0.75rem; border-radius: 4px; font-size: 0.9rem; font-weight: 600;">${info.label}</span>`;
+			};
+
+			const getApiHeaders = () => {
+				if (!isAdminSession) {
+					return { "Content-Type": "application/json" };
+				}
+				return {
+					"Content-Type": "application/json",
+					"X-Admin-Session": sessionStorage.getItem("vcbAdminToken") || ""
+				};
+			};
+
+			const clearLoanForm = () => {
+				adminLoanId.value = "";
+				adminInterestRate.value = "";
+				adminTermMonths.value = "";
+				adminPrincipalCycle.value = "";
+				adminLoanStatusSelect.value = "";
+				adminLoanStatus.style.display = "none";
+				adminLoanStatus.textContent = "";
+			};
+
+			const showAdminMessage = (message, kind = "ok") => {
+				adminLoanStatus.textContent = message;
+				adminLoanStatus.style.display = "block";
+				adminLoanStatus.className = kind === "ok" ? "action-status ok" : "action-status error";
+			};
+
+			// Tab switching
+			tabDefault.addEventListener("click", () => {
+				currentView = "default";
+				tabDefault.style.color = "#0066cc";
+				tabDefault.style.borderBottom = "2px solid #0066cc";
+				tabStatistics.style.color = "#999";
+				tabStatistics.style.borderBottom = "none";
+				defaultView.style.display = "block";
+				statisticsView.style.display = "none";
+			});
+
+			tabStatistics.addEventListener("click", () => {
+				currentView = "statistics";
+				tabStatistics.style.color = "#0066cc";
+				tabStatistics.style.borderBottom = "2px solid #0066cc";
+				tabDefault.style.color = "#999";
+				tabDefault.style.borderBottom = "none";
+				defaultView.style.display = "none";
+				statisticsView.style.display = "block";
+			});
+
+			const loadLoans = async () => {
+				loadingContainer.style.display = "block";
+				loansContainer.style.display = "none";
+				noLoansContainer.style.display = "none";
+				errorContainer.style.display = "none";
+
+				try {
+					const cccd = sessionStorage.getItem("vcbCCCD") || sessionStorage.getItem("vcbAdminCccd");
+					if (!cccd) {
+						throw new Error("CCCD not found in session. Please log in again.");
+					}
+
+					// Load default view (TinhDuNoConLai)
+					const response1 = await fetch(`${apiBase}/loans-with-debt/${encodeURIComponent(cccd)}`);
+					if (!response1.ok) {
+						if (response1.status === 401) {
+							invalidateSession();
+							return;
+						}
+						throw new Error("Failed to load loans");
+					}
+					const data1 = await response1.json();
+					
+					// Load statistics view (ThongKeDuNoKhoanVay)
+					const data2 = await loadStatistics(cccd);
+
+					displayLoans(data1, data2);
+				} catch (error) {
+					loadingContainer.style.display = "none";
+					errorContainer.style.display = "block";
+					errorMessage.textContent = `Error: ${error.message}`;
+				}
+			};
+
+			const displayLoans = (data1, data2) => {
+				loadingContainer.style.display = "none";
+
+				if (!data1.loans || data1.loans.length === 0) {
+					noLoansContainer.style.display = "block";
+					loansContainer.style.display = "none";
+					return;
+				}
+
+				loansStatus.textContent = `✓ You have ${data1.totalLoans} loan(s)`;
+				loansStatus.classList.add("ok");
+
+				// Render default view table
+				let tableHTML = `
+					<table style="width: 100%; border-collapse: collapse; font-size: 0.95rem;">
+						<thead>
+							<tr style="background: #f5f5f5; border-bottom: 2px solid #ddd;">
+								<th style="padding: 1rem; text-align: left; font-weight: 600;">Loan ID</th>
+								<th style="padding: 1rem; text-align: right; font-weight: 600;">Total Loan</th>
+								<th style="padding: 1rem; text-align: right; font-weight: 600;">Paid</th>
+								<th style="padding: 1rem; text-align: right; font-weight: 600;">Remaining Debt</th>
+								<th style="padding: 1rem; text-align: center; font-weight: 600;">Interest Rate</th>
+								<th style="padding: 1rem; text-align: center; font-weight: 600;">Status</th>
+							</tr>
+						</thead>
+						<tbody>
+				`;
+
+				data1.loans.forEach((loan, idx) => {
+					const rowBg = idx % 2 === 0 ? "#fafafa" : "white";
+					tableHTML += `
+						<tr style="border-bottom: 1px solid #eee; background: ${rowBg};">
+							<td style="padding: 1rem; font-weight: 600;">${loan.Ma_khoan_vay}</td>
+							<td style="padding: 1rem; text-align: right;">${formatMoney(loan.Tong_vay)} VND</td>
+							<td style="padding: 1rem; text-align: right;">${formatMoney(loan.da_tra)} VND</td>
+							<td style="padding: 1rem; text-align: right; color: #d32f2f; font-weight: 600;">${formatMoney(loan.du_no_con_lai)} VND</td>
+							<td style="padding: 1rem; text-align: center;">${(loan.Lai_suat * 100).toFixed(1)}%</td>
+							<td style="padding: 1rem; text-align: center;">${getStatusBadge(loan.Trang_thai)}</td>
+						</tr>
+					`;
+				});
+
+				tableHTML += `
+						</tbody>
+					</table>
+				`;
+				loansTable.innerHTML = tableHTML;
+
+				// Render statistics view table (if data available)
+				if (data2.statistics && data2.statistics.length > 0) {
+					let statsHTML = `
+						<table style="width: 100%; border-collapse: collapse; font-size: 0.95rem;">
+							<thead>
+								<tr style="background: #f5f5f5; border-bottom: 2px solid #ddd;">
+									<th style="padding: 1rem; text-align: left; font-weight: 600;">Loan ID</th>
+									<th style="padding: 1rem; text-align: right; font-weight: 600;">Total Loan</th>
+									<th style="padding: 1rem; text-align: right; font-weight: 600;">Total Paid</th>
+									<th style="padding: 1rem; text-align: right; font-weight: 600;">Remaining Debt</th>
+									<th style="padding: 1rem; text-align: center; font-weight: 600;">Account</th>
+								</tr>
+							</thead>
+							<tbody>
+					`;
+
+					data2.statistics.forEach((stat, idx) => {
+						const rowBg = idx % 2 === 0 ? "#fafafa" : "white";
+						const remainingDebt = (stat.Tong_von_vay || 0) - (stat.Tong_goc_da_tra || 0);
+						statsHTML += `
+							<tr style="border-bottom: 1px solid #eee; background: ${rowBg};">
+								<td style="padding: 1rem; font-weight: 600;">${stat.Ma_khoan_vay}</td>
+								<td style="padding: 1rem; text-align: right;">${formatMoney(stat.Tong_von_vay)} VND</td>
+								<td style="padding: 1rem; text-align: right;">${formatMoney(stat.Tong_goc_da_tra)} VND</td>
+								<td style="padding: 1rem; text-align: right; color: #d32f2f; font-weight: 600;">${formatMoney(stat.Du_no_goc_con_lai)} VND</td>
+								<td style="padding: 1rem; text-align: center;">${stat.So_tai_khoan}</td>
+							</tr>
+						`;
+					});
+
+					statsHTML += `
+							</tbody>
+						</table>
+					`;
+					statisticsTable.innerHTML = statsHTML;
+				}
+
+				defaultView.style.display = "block";
+				loansContainer.style.display = "block";
+				noLoansContainer.style.display = "none";
+				errorContainer.style.display = "none";
+			};
+
+			refreshBtn.addEventListener("click", loadLoans);
+			retryBtn.addEventListener("click", loadLoans);
+
+			// Load loans on page load
+			loadLoans();
+
+			async function loadStatistics(cccd, status = "", minPaid = 0) {
+				try {
+					const params = new URLSearchParams();
+					if (status) params.append("status", status);
+					params.append("min_paid", String(Number(minPaid || 0)));
+					const url = `${apiBase}/loan-statistics/${encodeURIComponent(cccd)}?${params.toString()}`;
+					const resp = await fetch(url);
+					if (!resp.ok) {
+						return { statistics: [] };
+					}
+					return await resp.json();
+				} catch (err) {
+					return { statistics: [] };
+				}
+			}
+
+			function renderStatistics(data2) {
+				if (!data2 || !Array.isArray(data2.statistics) || data2.statistics.length === 0) {
+					statisticsTable.innerHTML = '<div style="padding:1rem;">No statistics available</div>';
+					return;
+				}
+				let statsHTML = `
+					<table style="width: 100%; border-collapse: collapse; font-size: 0.95rem;">
+						<thead>
+							<tr style="background: #f5f5f5; border-bottom: 2px solid #ddd;">
+								<th style="padding: 1rem; text-align: left; font-weight: 600;">Loan ID</th>
+								<th style="padding: 1rem; text-align: right; font-weight: 600;">Total Loan</th>
+								<th style="padding: 1rem; text-align: right; font-weight: 600;">Total Paid</th>
+								<th style="padding: 1rem; text-align: right; font-weight: 600;">Remaining Debt</th>
+								<th style="padding: 1rem; text-align: center; font-weight: 600;">Account</th>
+							</tr>
+						</thead>
+						<tbody>
+					`;
+
+				data2.statistics.forEach((stat, idx) => {
+					const rowBg = idx % 2 === 0 ? "#fafafa" : "white";
+					statsHTML += `
+						<tr style="border-bottom: 1px solid #eee; background: ${rowBg};">
+							<td style="padding: 1rem; font-weight: 600;">${stat.Ma_khoan_vay}</td>
+							<td style="padding: 1rem; text-align: right;">${formatMoney(stat.Tong_von_vay)} VND</td>
+							<td style="padding: 1rem; text-align: right;">${formatMoney(stat.Tong_goc_da_tra)} VND</td>
+							<td style="padding: 1rem; text-align: right; color: #d32f2f; font-weight: 600;">${formatMoney(stat.Du_no_goc_con_lai)} VND</td>
+							<td style="padding: 1rem; text-align: center;">${stat.So_tai_khoan}</td>
+						</tr>
+					`;
+				});
+
+				statsHTML += `
+						</tbody>
+					</table>
+				`;
+
+				statisticsTable.innerHTML = statsHTML;
+			}
+
+			if (runStatsBtn) {
+				runStatsBtn.addEventListener("click", async () => {
+					const cccd = sessionStorage.getItem("vcbCCCD") || sessionStorage.getItem("vcbAdminCccd");
+					if (!cccd) {
+						statStatusMsg.textContent = "Session invalid. Please reload.";
+						return;
+					}
+					const statusVal = statStatusSelect ? statStatusSelect.value : "";
+					const minPaidVal = statMinPaidInput ? Number(statMinPaidInput.value || 0) : 0;
+					statStatusMsg.textContent = "Loading...";
+					try {
+						const data2 = await loadStatistics(cccd, statusVal, minPaidVal);
+						renderStatistics(data2);
+						statStatusMsg.textContent = data2 && data2.totalLoans !== undefined ? `${data2.totalLoans} loan(s)` : "Updated";
+					} catch (err) {
+						statStatusMsg.textContent = "Error loading statistics";
+					}
+					setTimeout(() => { statStatusMsg.textContent = ""; }, 2500);
+				});
+			}
+		});
+	</script>
+
+	<style>
+		.action-status.ok {
+			color: #4caf50;
+			font-weight: 600;
+			padding: 1rem;
+			background: #e8f5e9;
+			border-radius: 4px;
+		}
+
+		table {
+			box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+			border-radius: 4px;
+			overflow: hidden;
+		}
+
+		.tab-button {
+			transition: all 0.3s ease;
+		}
+
+		.tab-button:hover {
+			color: #0066cc !important;
+		}
+	</style>
+</body>
+</html>

@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8" />
+	<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+	<title>Vietcombank | Create Savings Account</title>
+	<link rel="preconnect" href="https://fonts.googleapis.com" />
+	<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+	<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=Manrope:wght@500;700;800&display=swap" rel="stylesheet" />
+	<link rel="stylesheet" href="styles.css" />
+	<script src="auth-watchdog.js"></script>
+	<script>
+		if (sessionStorage.getItem("vcbAuthenticated") !== "true") {
+			location.replace("index.html");
+		}
+	</script>
+</head>
+<body class="home-page">
+	<div class="home-shell home-main-shell">
+		<header class="home-topbar">
+			<div class="home-brand">
+				<div class="home-logo-frame">
+					<img src="assets/logo-vietcombank.png" alt="Vietcombank logo" />
+				</div>
+				<div class="home-brand-copy">
+					<strong>Vietcombank</strong>
+					<span>Create savings account</span>
+				</div>
+			</div>
+			<nav class="home-nav" aria-label="Secondary navigation">
+				<a href="home.html">Back to home</a>
+				<a href="create-account.html">Create payment account</a>
+				<button class="home-nav-button" id="logoutBtn" type="button">Logout</button>
+			</nav>
+		</header>
+
+		<section class="db-card" style="margin-top: 12px;">
+			<h3>Create savings account</h3>
+			<form id="createSavingsAccountForm" class="action-form" autocomplete="off">
+				<label class="action-field" for="newSavingsUsername">
+					<span>New username</span>
+					<input id="newSavingsUsername" name="newSavingsUsername" type="text" placeholder="new_savings_username" required />
+				</label>
+				<label class="action-field" for="newSavingsPassword">
+					<span>New password (>= 8 characters)</span>
+					<input id="newSavingsPassword" name="newSavingsPassword" type="password" minlength="8" placeholder="Password123" required />
+				</label>
+				<label class="action-field" for="savingsTermMonths">
+					<span>Ky han (months)</span>
+					<input id="savingsTermMonths" name="savingsTermMonths" type="number" min="1" step="1" value="12" required />
+				</label>
+				<label class="action-field" for="savingsInterestRate">
+					<span>Lai suat (0 to 0.2)</span>
+					<input id="savingsInterestRate" name="savingsInterestRate" type="number" min="0" max="0.2" step="0.001" value="0.06" required />
+				</label>
+				<label class="action-field" for="savingsAmount">
+					<span>So tien (VND)</span>
+					<input id="savingsAmount" name="savingsAmount" type="number" min="0" step="1000" value="30000000" required />
+				</label>
+				<label class="action-field" for="savingsReceiveMethod">
+					<span>Hinh thuc nhan</span>
+					<select id="savingsReceiveMethod" name="savingsReceiveMethod" required>
+						<option value="Online">Online</option>
+						<option value="Offline">Offline</option>
+					</select>
+				</label>
+				<label class="action-field" for="savingsPromotionCode">
+					<span>Promotion (optional)</span>
+					<select id="savingsPromotionCode" name="savingsPromotionCode">
+						<option value="">No promotion</option>
+					</select>
+				</label>
+				<button class="action-button" type="submit">Create savings account</button>
+				<p class="action-status" id="savingsActionStatus" aria-live="polite"></p>
+			</form>
+		</section>
+	</div>
+
+	<script>
+		const apiBase = window.location.origin.startsWith("http")
+			? `${window.location.origin}/api`
+			: "http://localhost:8080/api";
+
+		const cccd = sessionStorage.getItem("vcbCCCD") || "";
+		const logoutBtn = document.getElementById("logoutBtn");
+		const createSavingsAccountForm = document.getElementById("createSavingsAccountForm");
+		const newSavingsUsername = document.getElementById("newSavingsUsername");
+		const newSavingsPassword = document.getElementById("newSavingsPassword");
+		const savingsTermMonths = document.getElementById("savingsTermMonths");
+		const savingsInterestRate = document.getElementById("savingsInterestRate");
+		const savingsAmount = document.getElementById("savingsAmount");
+		const savingsReceiveMethod = document.getElementById("savingsReceiveMethod");
+		const savingsPromotionCode = document.getElementById("savingsPromotionCode");
+		const savingsActionStatus = document.getElementById("savingsActionStatus");
+
+		const clearCustomerSession = () => {
+			window.VCBSessionWatchdog.clearCustomerSession();
+		};
+
+		const invalidateCustomerSession = () => {
+			clearCustomerSession();
+			window.location.replace("index.html");
+		};
+
+		window.VCBSessionWatchdog.start({
+			intervalMs: 15000,
+			onInvalid: invalidateCustomerSession,
+			validator: async () => {
+				if (!cccd) {
+					return false;
+				}
+
+				const healthResponse = await window.VCBSessionWatchdog.fetchWithTimeout(`${apiBase}/health`, {
+					cache: "no-store"
+				});
+				if (!healthResponse.ok) {
+					return false;
+				}
+
+				const accountResponse = await window.VCBSessionWatchdog.fetchWithTimeout(
+					`${apiBase}/accounts?cccd=${encodeURIComponent(cccd)}`,
+					{ cache: "no-store" }
+				);
+				if (!accountResponse.ok) {
+					return false;
+				}
+
+				const accounts = await accountResponse.json();
+				return Array.isArray(accounts) && accounts.length > 0;
+			}
+		});
+
+		const setActionStatus = (message, isOk = false) => {
+			savingsActionStatus.textContent = message;
+			savingsActionStatus.classList.toggle("ok", isOk);
+		};
+
+		const formatVndNumber = (num) => {
+			return new Intl.NumberFormat("en-US").format(num);
+		};
+
+		const loadPromotions = async () => {
+			try {
+				const response = await fetch(`${apiBase}/promotions?feature=savings`);
+				if (!response.ok) {
+					throw new Error("Failed to load promotions");
+				}
+
+				const promotions = await response.json();
+				if (!Array.isArray(promotions) || !promotions.length) {
+					savingsPromotionCode.innerHTML = '<option value="">No promotion available</option>';
+					return;
+				}
+
+				savingsPromotionCode.innerHTML = [
+					'<option value="">No promotion</option>',
+					...promotions.map((item) => {
+						const minAmount = formatVndNumber(Number(item.So_tien_toi_thieu || 0));
+						const valueAmount = formatVndNumber(Number(item.So_tien_khuyen_mai || 0));
+						const remaining = Number(item.So_luong || 0);
+						const title = item.Ten_chuong_trinh || item.Ma;
+						return `<option value="${item.Ma}">${item.Ma} - ${title} (min ${minAmount} VND, value ${valueAmount} VND, left ${remaining})</option>`;
+					})
+				].join("");
+			} catch (error) {
+				savingsPromotionCode.innerHTML = '<option value="">No promotion available</option>';
+			}
+		};
+
+		logoutBtn.addEventListener("click", () => {
+			clearCustomerSession();
+			window.location.replace("index.html");
+		});
+
+		createSavingsAccountForm.addEventListener("submit", async (event) => {
+			event.preventDefault();
+
+			const username = newSavingsUsername.value.trim();
+			const password = newSavingsPassword.value.trim();
+			const termMonths = Number.parseInt(savingsTermMonths.value, 10);
+			const interestRate = Number.parseFloat(savingsInterestRate.value);
+			const amount = Number.parseFloat(savingsAmount.value);
+			const receiveMethod = savingsReceiveMethod.value;
+			const promotionCode = savingsPromotionCode.value.trim();
+
+			if (!cccd) {
+				setActionStatus("No CCCD found in session. Please login again.");
+				return;
+			}
+
+			if (!username || !password || !receiveMethod) {
+				setActionStatus("Username, password, and receive method are required.");
+				return;
+			}
+
+			if (password.length < 8) {
+				setActionStatus("Password must be at least 8 characters.");
+				return;
+			}
+
+			if (!Number.isFinite(termMonths) || termMonths <= 0) {
+				setActionStatus("Ky han must be a number greater than 0.");
+				return;
+			}
+
+			if (!Number.isFinite(interestRate) || interestRate < 0 || interestRate > 0.2) {
+				setActionStatus("Lai suat must be between 0 and 0.2.");
+				return;
+			}
+
+			if (!Number.isFinite(amount) || amount < 0) {
+				setActionStatus("So tien must be 0 or greater.");
+				return;
+			}
+
+			try {
+				const response = await fetch(`${apiBase}/savings-accounts/create`, {
+					method: "POST",
+					headers: {
+						"Content-Type": "application/json"
+					},
+					body: JSON.stringify({
+						cccd,
+						username,
+						password,
+						termMonths,
+						interestRate,
+						amount,
+						receiveMethod,
+						promotionCode: promotionCode || undefined
+					})
+				});
+
+				const payload = await response.json();
+				if (!response.ok) {
+					setActionStatus(payload.message || "Failed to create savings account.");
+					return;
+				}
+
+				setActionStatus(`${payload.message} Account: ${payload.accountNumber}.`, true);
+				createSavingsAccountForm.reset();
+				savingsTermMonths.value = "12";
+				savingsInterestRate.value = "0.06";
+				savingsAmount.value = "30000000";
+				savingsReceiveMethod.value = "Online";
+				await loadPromotions();
+			} catch (error) {
+				setActionStatus("Cannot connect to API. Start backend server and try again.");
+			}
+		});
+
+		loadPromotions();
+	</script>
+</body>
+</html>

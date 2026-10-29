@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8" />
+	<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+	<title>Vietcombank | Register Account</title>
+	<link rel="preconnect" href="https://fonts.googleapis.com" />
+	<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+	<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=Manrope:wght@500;700;800&display=swap" rel="stylesheet" />
+	<link rel="stylesheet" href="styles.css" />
+</head>
+<body class="login-page">
+	<main class="login-shell">
+		<section class="card login-card">
+			<div class="login-brand">
+				<div class="home-logo-frame login-logo-frame">
+					<img src="assets/logo-vietcombank.png" alt="Vietcombank logo" />
+				</div>
+				<div class="login-brand-copy">
+					<span class="login-kicker">Registration</span>
+					<h1>Create Banking Account</h1>
+					<p>Create a new customer account, then use those credentials on the login page.</p>
+				</div>
+			</div>
+
+			<form id="registerForm" class="register-form" autocomplete="off">
+				<div class="register-grid">
+					<label class="login-field" for="regFirstName">
+						<span>First name</span>
+						<input id="regFirstName" name="regFirstName" type="text" placeholder="Nguyen" required />
+					</label>
+					<label class="login-field" for="regMiddleName">
+						<span>Middle name</span>
+						<input id="regMiddleName" name="regMiddleName" type="text" placeholder="Van" />
+					</label>
+					<label class="login-field" for="regLastName">
+						<span>Last name</span>
+						<input id="regLastName" name="regLastName" type="text" placeholder="An" required />
+					</label>
+					<label class="login-field" for="regCCCD">
+						<span>CCCD (12 digits)</span>
+						<input id="regCCCD" name="regCCCD" type="text" inputmode="numeric" maxlength="12" placeholder="012345678901" required />
+					</label>
+					<label class="login-field" for="regPhone">
+						<span>Phone (10 digits)</span>
+						<input id="regPhone" name="regPhone" type="text" inputmode="numeric" maxlength="10" placeholder="0912345678" required />
+					</label>
+					<label class="login-field" for="regEmail">
+						<span>Email</span>
+						<input id="regEmail" name="regEmail" type="email" maxlength="50" pattern="^[^\s@]+@[^\s@]+\.[^\s@]+$" placeholder="name@email.com" title="Enter a valid email address without spaces." />
+					</label>
+					<label class="login-field" for="regReferrerCccd">
+						<span>Referrer CCCD</span>
+						<input id="regReferrerCccd" name="regReferrerCccd" type="text" inputmode="numeric" maxlength="12" pattern="^\d{12}$" placeholder="Optional 12-digit CCCD" />
+					</label>
+					<label class="login-field" for="regNationality">
+						<span>Nationality</span>
+						<input id="regNationality" name="regNationality" type="text" value="Viet Nam" required />
+					</label>
+					<label class="login-field" for="regGender">
+						<span>Gender</span>
+						<select id="regGender" name="regGender" required>
+							<option value="Nam">Nam</option>
+							<option value="Nu">Nu</option>
+						</select>
+					</label>
+					<label class="login-field" for="regDob">
+						<span>Date of birth</span>
+						<input id="regDob" name="regDob" type="date" required />
+					</label>
+					<label class="login-field" for="regUsername">
+						<span>Username</span>
+						<input id="regUsername" name="regUsername" type="text" placeholder="new_user" required />
+					</label>
+					<label class="login-field" for="regPassword">
+						<span>Password (>= 8 characters)</span>
+						<input id="regPassword" name="regPassword" type="password" minlength="8" placeholder="Password123" required />
+					</label>
+				</div>
+				<button class="login-submit register-submit" type="submit">Create account</button>
+				<p class="register-status" id="registerStatus" aria-live="polite"></p>
+				<a class="home-button secondary" href="index.html">Back to Login</a>
+			</form>
+		</section>
+	</main>
+
+	<script>
+		const apiBase = window.location.origin.startsWith("http")
+			? `${window.location.origin}/api`
+			: "http://localhost:8080/api";
+
+		const registerForm = document.getElementById("registerForm");
+		const registerStatus = document.getElementById("registerStatus");
+		const regFirstName = document.getElementById("regFirstName");
+		const regMiddleName = document.getElementById("regMiddleName");
+		const regLastName = document.getElementById("regLastName");
+		const regCccd = document.getElementById("regCCCD");
+		const regPhone = document.getElementById("regPhone");
+		const regEmail = document.getElementById("regEmail");
+		const regReferrerCccd = document.getElementById("regReferrerCccd");
+		const regNationality = document.getElementById("regNationality");
+		const regGender = document.getElementById("regGender");
+		const regDob = document.getElementById("regDob");
+		const regUsername = document.getElementById("regUsername");
+		const regPassword = document.getElementById("regPassword");
+
+		registerForm.addEventListener("submit", async (event) => {
+			event.preventDefault();
+
+			const payload = {
+				firstName: regFirstName.value.trim(),
+				middleName: regMiddleName.value.trim(),
+				lastName: regLastName.value.trim(),
+				cccd: regCccd.value.trim(),
+				phone: regPhone.value.trim(),
+				email: regEmail.value.trim(),
+				referrerCccd: regReferrerCccd.value.trim(),
+				nationality: regNationality.value.trim(),
+				gender: regGender.value,
+				dob: regDob.value,
+				username: regUsername.value.trim(),
+				password: regPassword.value.trim()
+			};
+
+			if (!payload.firstName || !payload.lastName || !payload.cccd || !payload.phone || !payload.username || !payload.password || !payload.dob) {
+				registerStatus.textContent = "Fill in all required fields.";
+				registerStatus.classList.remove("ok");
+				return;
+			}
+
+			if (!/^\d{12}$/.test(payload.cccd)) {
+				registerStatus.textContent = "CCCD must contain exactly 12 digits.";
+				registerStatus.classList.remove("ok");
+				return;
+			}
+
+			if (!/^\d{10}$/.test(payload.phone)) {
+				registerStatus.textContent = "Phone must contain exactly 10 digits.";
+				registerStatus.classList.remove("ok");
+				return;
+			}
+
+			if (payload.email && (!/^\S+@\S+\.\S+$/.test(payload.email) || payload.email.length > 50)) {
+				registerStatus.textContent = "Email must be valid and at most 50 characters.";
+				registerStatus.classList.remove("ok");
+				return;
+			}
+
+			if (payload.referrerCccd && !/^\d{12}$/.test(payload.referrerCccd)) {
+				registerStatus.textContent = "Referrer CCCD must contain exactly 12 digits.";
+				registerStatus.classList.remove("ok");
+				return;
+			}
+
+			if (payload.password.length < 8) {
+				registerStatus.textContent = "Password must be at least 8 characters.";
+				registerStatus.classList.remove("ok");
+				return;
+			}
+
+			try {
+				const response = await fetch(`${apiBase}/auth/register`, {
+					method: "POST",
+					headers: {
+						"Content-Type": "application/json"
+					},
+					body: JSON.stringify(payload)
+				});
+
+				const data = await response.json();
+				if (!response.ok) {
+					registerStatus.textContent = data.message || "Cannot create account.";
+					registerStatus.classList.remove("ok");
+					return;
+				}
+
+				registerStatus.textContent = `${data.message} Account: ${data.accountNumber}.`;
+				registerStatus.classList.add("ok");
+				registerForm.reset();
+			} catch (error) {
+				registerStatus.textContent = "Cannot connect to API. Start Flask server and try again.";
+				registerStatus.classList.remove("ok");
+			}
+		});
+	</script>
+</body>
+</html>

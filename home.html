@@ -1,0 +1,1501 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8" />
+	<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+	<title>Vietcombank | Home</title>
+	<link rel="preconnect" href="https://fonts.googleapis.com" />
+	<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+	<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=Manrope:wght@500;700;800&display=swap" rel="stylesheet" />
+	<link rel="stylesheet" href="styles.css" />
+	<script src="auth-watchdog.js"></script>
+	<script>
+		if (sessionStorage.getItem("vcbAuthenticated") !== "true") {
+			location.replace("index.html");
+		}
+	</script>
+</head>
+<body class="home-page">
+	<div class="home-shell home-main-shell" id="top">
+		<header class="home-topbar">
+			<div class="home-brand">
+				<div class="home-logo-frame">
+					<img src="assets/logo-vietcombank.png" alt="Vietcombank logo" />
+				</div>
+				<div class="home-brand-copy">
+					<strong>Vietcombank</strong>
+					<span>Personal banking made simple</span>
+				</div>
+			</div>
+			<nav class="home-nav" aria-label="Primary navigation">
+				<a href="#database-view">Database view</a>
+				<a href="#utilities">Utilities</a>
+				<button class="home-nav-button" id="openPersonalInfoBtn" type="button">Personal info</button>
+				<button class="home-nav-button" id="logoutBtn" type="button">Logout</button>
+			</nav>
+		</header>
+
+		<section class="hero-panel">
+			<div class="hero-copy">
+				<span class="eyebrow reveal-block" style="--delay: 0ms;">Connected to MySQL</span>
+				<h1 class="reveal-block intro-block" style="--delay: 90ms;">Welcome, <span id="welcomeName">Customer</span>.</h1>
+				<p class="reveal-block intro-block" style="--delay: 180ms;">
+				</p>
+				<div class="home-user-meta reveal-block" style="--delay: 220ms;">
+					<span class="user-pill">CCCD: <strong id="userCccd">-</strong></span>
+					<span class="user-pill">Primary account: <strong id="userPrimaryAccount">-</strong></span>
+				</div>
+				<div class="hero-actions reveal-block" style="--delay: 260ms;">
+					<a class="home-button primary" href="#database-view">Open database view</a>
+					<a class="home-button secondary" href="create-account.html">Create account</a>
+					<a class="home-button secondary" href="create-savings-account.html">Create savings account</a>
+					<a class="home-button secondary" href="create-loan.html">Create loan</a>
+					<a class="home-button secondary" href="create-card.html">Create card</a>
+					<a class="home-button secondary" href="create-transaction.html">Create transaction</a>
+					<a class="home-button secondary" href="transaction-history.html">View transaction history</a>
+					<a class="home-button secondary" href="loan-details.html">View Loan Details</a>
+				</div>
+			</div>
+
+			<div class="hero-aside">
+				<div class="summary-card reveal-block" id="overview" style="--delay: 160ms;">
+					<div class="summary-head">
+						<strong>Total available balance</strong>
+					</div>
+					<div class="balance" id="totalBalance">Loading...</div>
+					<div class="mini-grid">
+						<div class="mini-tile">
+							<span>Active accounts</span>
+							<strong id="activeAccountCount">-</strong>
+						</div>
+						<div class="mini-tile">
+							<span>Total spending limit</span>
+							<strong id="totalLimit">-</strong>
+						</div>
+					</div>
+				</div>
+				<div class="summary-card reveal-block" style="--delay: 260ms;">
+					<div class="summary-head">
+						<strong>Recent activity</strong>
+					</div>
+					<div class="mini-grid">
+						<div class="mini-tile">
+							<span>Latest transaction</span>
+							<strong id="latestTransaction">-</strong>
+						</div>
+						<div class="mini-tile">
+							<span>Latest transaction time</span>
+							<strong id="latestTransactionTime">-</strong>
+						</div>
+					</div>
+				</div>
+			</div>
+		</section>
+
+		<div class="section-heading" id="database-view">
+			<h2>Live database view</h2>
+			<p id="dataStatus">Loading data from API...</p>
+		</div>
+
+		<section class="db-grid">
+			<article class="db-card reveal-block" style="--delay: 120ms;">
+				<div class="db-card-head">
+					<h3 class="accounts-title">Your accounts</h3>
+					<div class="account-type-toggle" role="group" aria-label="Filter account types">
+						<button class="toggle-chip is-active" id="filterAllBtn" type="button">All</button>
+						<button class="toggle-chip" id="filterPaymentBtn" type="button">Payment</button>
+						<button class="toggle-chip" id="filterSavingsBtn" type="button">Savings</button>
+					</div>
+				</div>
+				<p class="account-filter-hint" id="accountFilterHint">Showing all account products.</p>
+				<div id="accountList" class="account-list"></div>
+			</article>
+
+			<article class="db-card reveal-block" style="--delay: 220ms;">
+				<div class="db-card-head">
+					<h3>Recent transactions</h3>
+					<label class="account-switcher" for="accountSwitcher">
+						<span>View account</span>
+						<select id="accountSwitcher" aria-label="Select account for balance and transactions"></select>
+					</label>
+				</div>
+				<div class="table-wrap recent-transactions-wrap">
+					<table class="db-table" aria-label="Recent transactions">
+						<thead>
+							<tr>
+								<th>Transaction ID</th>
+								<th>Amount</th>
+								<th>Fee</th>
+								<th>Promotion</th>
+								<th>Date</th>
+							</tr>
+						</thead>
+						<tbody id="transactionRows"></tbody>
+					</table>
+				</div>
+			</article>
+
+			<article class="db-card reveal-block" style="--delay: 280ms;">
+				<h3>Khoan_vay (Loans)</h3>
+				<div class="table-wrap loan-history-wrap">
+					<table class="db-table" aria-label="Loans">
+						<thead>
+							<tr>
+								<th>Loan ID</th>
+								<th>Loan amount</th>
+								<th>Interest</th>
+								<th>Term (months)</th>
+								<th>Principal cycle</th>
+								<th>Status</th>
+								<th>Account</th>
+							</tr>
+						</thead>
+						<tbody id="loanRows"></tbody>
+					</table>
+				</div>
+			</article>
+
+			<article class="db-card reveal-block" style="--delay: 320ms;">
+				<div class="db-card-head">
+					<h3>Thanh_toan_khoan_vay (Repayments)</h3>
+					<button class="home-nav-button" id="runAutoDebitBtn" type="button">Run auto-debit</button>
+				</div>
+				<div class="table-wrap">
+					<table class="db-table" aria-label="Loan repayments summary">
+						<thead>
+							<tr>
+								<th>Loan ID</th>
+								<th>Status</th>
+								<th>Action</th>
+								<th>Detail</th>
+							</tr>
+						</thead>
+						<tbody id="loanPaymentRows"></tbody>
+					</table>
+				</div>
+			</article>
+
+			<article class="db-card reveal-block" style="--delay: 360ms;">
+				<h3>Hoa_don (Bills)</h3>
+				<div class="table-wrap">
+					<table class="db-table" aria-label="Bills">
+						<thead>
+							<tr>
+								<th>Bill ID</th>
+								<th>Type</th>
+								<th>Amount</th>
+								<th>Account</th>
+								<th>Transaction</th>
+								<th>Action</th>
+							</tr>
+						</thead>
+						<tbody id="billRows"></tbody>
+					</table>
+				</div>
+			</article>
+
+			<article class="db-card reveal-block" style="--delay: 400ms;">
+				<h3>Khuyen_mai (Promotion History)</h3>
+				<div class="table-wrap">
+					<table class="db-table" aria-label="Promotion History">
+						<thead>
+							<tr>
+								<th>Promo Code</th>
+								<th>Program Name</th>
+								<th>Start Date</th>
+								<th>End Date</th>
+								<th>Assigned By</th>
+								<th>Assign Date</th>
+							</tr>
+						</thead>
+						<tbody id="promoHistoryRows"></tbody>
+					</table>
+				</div>
+			</article>
+		</section>
+
+		<section class="card-management-panel reveal-block" style="--delay: 280ms;" aria-label="Card management">
+			<div class="section-heading compact-heading">
+				<h2>Card management</h2>
+				<p>Browse your linked cards with image, number, and expiry date.</p>
+			</div>
+			<div class="card-carousel-shell">
+				<button class="carousel-nav carousel-prev" id="cardPrevBtn" type="button" aria-label="Previous card">‹</button>
+				<div class="card-carousel-viewport" id="cardCarouselViewport">
+					<div class="card-carousel-track" id="cardCarouselTrack"></div>
+				</div>
+				<button class="carousel-nav carousel-next" id="cardNextBtn" type="button" aria-label="Next card">›</button>
+			</div>
+			<div class="card-carousel-status" id="cardCarouselStatus"></div>
+		</section>
+
+		<div class="section-heading" id="utilities">
+			<h2>Suggested utilities</h2>
+		</div>
+
+		<section class="tile-grid">
+			<a class="tile tile-link tall" href="utilities/loan-emi.html" style="--delay: 120ms;">
+				<div class="chip">Calculator</div>
+				<h3>Loan estimate</h3>
+				<p>Quickly estimate monthly payments for a loan or installment plan.</p>
+				<div class="foot">Open EMI tool</div>
+			</a>
+
+			<article class="tile tall" style="--delay: 200ms;">
+				<div class="chip">Locator</div>
+				<h3>Branch finder</h3>
+				<p>Help users find nearby branches, ATMs, or service points in seconds.</p>
+				<div class="foot">Location driven</div>
+			</article>
+
+			<a class="tile tile-link tall" href="utilities/exchange.html" style="--delay: 280ms;">
+				<div class="chip">Rates</div>
+				<h3>Exchange rates</h3>
+				<p>Show live currency exchange rates for common travel and trade needs.</p>
+				<div class="foot">Open exchange utility</div>
+			</a>
+
+			<article class="tile tall" style="--delay: 360ms;">
+				<div class="chip">Bills</div>
+				<h3>Bill reminders</h3>
+				<p>Track electricity, water, internet, and card payment due dates in one place.</p>
+				<div class="foot">Everyday utility</div>
+			</article>
+
+			<a class="tile tile-link tall" href="utilities/weather.html" style="--delay: 440ms;">
+				<div class="chip">Weather</div>
+				<h3>Weather</h3>
+				<p>Check local weather before trips, branch visits, or business travel.</p>
+				<div class="foot">Open weather tool</div>
+			</a>
+
+			<a class="tile tile-link tall" href="utilities/stock.html" style="--delay: 520ms;">
+				<div class="chip">Stocks</div>
+				<h3>Stock monitoring</h3>
+				<p>Track current quote details and maintain a quick watchlist for key symbols.</p>
+				<div class="foot">Open stock monitor</div>
+			</a>
+		</section>
+
+		<div class="footer-strip credits-strip reveal-block" style="--delay: 520ms;">
+			<div class="credits-heading">
+				<img class="credits-icon" src="assets/Icon-Vietcombank.png" alt="Vietcombank icon" />
+				<span class="credits-title">Database Major Assignment 2</span>
+			</div>
+			<span class="credits-names">Ngô Thanh Tùng<br>Phạm Viết Trường<br>Lê Văn Hiển<br>Nguyễn Hoàng Tùng<br>Nguyễn Tấn Phước</span>
+		</div>
+	</div>
+
+	<div class="modal-backdrop" id="repaymentDetailsModal" aria-hidden="true">
+		<div class="modal-shell" role="dialog" aria-modal="true" aria-labelledby="repaymentDetailsTitle">
+			<div class="modal-head">
+				<h3 id="repaymentDetailsTitle">Repayment Details</h3>
+				<button class="modal-close" id="closeRepaymentDetailsBtn" type="button" aria-label="Close">x</button>
+			</div>
+			<div class="modal-body">
+				<div class="table-wrap">
+					<div id="repaymentDetailsContent"></div>
+				</div>
+			</div>
+		</div>
+	</div>
+
+	<div class="modal-backdrop" id="repaymentPlanModal" aria-hidden="true">
+		<div class="modal-shell" role="dialog" aria-modal="true" aria-labelledby="repaymentPlanTitle">
+			<div class="modal-head">
+				<h3 id="repaymentPlanTitle">Repayment Plan</h3>
+				<button class="modal-close" id="closeRepaymentPlanBtn" type="button" aria-label="Close">x</button>
+			</div>
+			<div class="modal-body">
+				<div class="table-wrap">
+					<table class="db-table" aria-label="Detailed repayment schedule">
+						<thead>
+							<tr>
+								<th>Payment ID</th>
+								<th>Due date</th>
+								<th>Paid date</th>
+								<th>Interest rate</th>
+								<th>Principal</th>
+								<th>Outstanding</th>
+								<th>Status</th>
+								<th>Action</th>
+							</tr>
+						</thead>
+						<tbody id="repaymentDetailRows"></tbody>
+					</table>
+				</div>
+			</div>
+		</div>
+	</div>
+
+	<div class="modal-backdrop" id="personalInfoModal" aria-hidden="true">
+		<div class="modal-shell" role="dialog" aria-modal="true" aria-labelledby="personalInfoTitle">
+			<div class="modal-head">
+				<h3 id="personalInfoTitle">Personal information</h3>
+				<button class="modal-close" id="closePersonalInfoBtn" type="button" aria-label="Close">x</button>
+			</div>
+			<div class="modal-body info-list">
+				<div class="info-item"><span>Name</span><strong id="piName">-</strong></div>
+				<div class="info-item"><span>CCCD</span><strong id="piCccd">-</strong></div>
+				<div class="info-item"><span>Gender</span><strong id="piGender">-</strong></div>
+				<div class="info-item"><span>Date of Birth</span><strong id="piDob">-</strong></div>
+				<div class="info-item"><span>Phone number</span><strong id="piPhone">-</strong></div>
+				<div class="info-item"><span>Email</span><strong id="piEmail">-</strong></div>
+				<div class="info-item"><span>Referrer CCCD</span><strong id="piReferrer">-</strong></div>
+				<div class="info-item"><span>Card type</span><div class="chip-wrap" id="piCardTypes"></div></div>
+			</div>
+		</div>
+	</div>
+
+	<div class="modal-backdrop" id="billPaymentModal" aria-hidden="true">
+		<div class="modal-shell" role="dialog" aria-modal="true" aria-labelledby="billPaymentTitle">
+			<div class="modal-head">
+				<h3 id="billPaymentTitle">Pay Bill</h3>
+				<button class="modal-close" id="closeBillPaymentBtn" type="button" aria-label="Close">x</button>
+			</div>
+			<div class="modal-body">
+				<form id="billPaymentForm" class="action-form" style="margin: 0;">
+					<div class="info-item"><span>Bill ID</span><strong id="billPaymentBillId">-</strong></div>
+					<div class="info-item"><span>Amount</span><strong id="billPaymentAmount">-</strong></div>
+					<label class="action-field" for="billPaymentPromotion">
+						<span>Promotion (optional)</span>
+						<select id="billPaymentPromotion" name="billPaymentPromotion">
+							<option value="">No promotion</option>
+						</select>
+					</label>
+					<button class="action-button" type="submit" id="billPaymentSubmitBtn">Pay Bill</button>
+					<p class="action-status" id="billPaymentStatus" aria-live="polite"></p>
+				</form>
+			</div>
+		</div>
+	</div>
+
+	<script>
+		window.addEventListener("load", () => {
+			document.body.classList.add("home-ready");
+
+			const apiBase = window.location.origin.startsWith("http")
+				? `${window.location.origin}/api`
+				: "http://localhost:8080/api";
+
+			const welcomeName = document.getElementById("welcomeName");
+			const userCccd = document.getElementById("userCccd");
+			const userPrimaryAccount = document.getElementById("userPrimaryAccount");
+			const totalBalance = document.getElementById("totalBalance");
+			const activeAccountCount = document.getElementById("activeAccountCount");
+			const totalLimit = document.getElementById("totalLimit");
+			const latestTransaction = document.getElementById("latestTransaction");
+			const latestTransactionTime = document.getElementById("latestTransactionTime");
+			const dataStatus = document.getElementById("dataStatus");
+			const openPersonalInfoBtn = document.getElementById("openPersonalInfoBtn");
+			const personalInfoModal = document.getElementById("personalInfoModal");
+			const closePersonalInfoBtn = document.getElementById("closePersonalInfoBtn");
+			const piName = document.getElementById("piName");
+			const piCccd = document.getElementById("piCccd");
+			const piGender = document.getElementById("piGender");
+			const piDob = document.getElementById("piDob");
+			const piPhone = document.getElementById("piPhone");
+			const piEmail = document.getElementById("piEmail");
+			const piReferrer = document.getElementById("piReferrer");
+			const piCardTypes = document.getElementById("piCardTypes");
+			const accountList = document.getElementById("accountList");
+			const filterAllBtn = document.getElementById("filterAllBtn");
+			const filterPaymentBtn = document.getElementById("filterPaymentBtn");
+			const filterSavingsBtn = document.getElementById("filterSavingsBtn");
+			const accountFilterHint = document.getElementById("accountFilterHint");
+			const transactionRows = document.getElementById("transactionRows");
+			const loanRows = document.getElementById("loanRows");
+			const loanPaymentRows = document.getElementById("loanPaymentRows");
+			const billRows = document.getElementById("billRows");
+			const promoHistoryRows = document.getElementById("promoHistoryRows");
+			const runAutoDebitBtn = document.getElementById("runAutoDebitBtn");
+			const repaymentPlanModal = document.getElementById("repaymentPlanModal");
+			const closeRepaymentPlanBtn = document.getElementById("closeRepaymentPlanBtn");
+			const repaymentDetailRows = document.getElementById("repaymentDetailRows");
+			const repaymentDetailsModal = document.getElementById("repaymentDetailsModal");
+			const closeRepaymentDetailsBtn = document.getElementById("closeRepaymentDetailsBtn");
+			const repaymentDetailsContent = document.getElementById("repaymentDetailsContent");
+			const billPaymentModal = document.getElementById("billPaymentModal");
+			const closeBillPaymentBtn = document.getElementById("closeBillPaymentBtn");
+			const billPaymentForm = document.getElementById("billPaymentForm");
+			const billPaymentBillId = document.getElementById("billPaymentBillId");
+			const billPaymentAmount = document.getElementById("billPaymentAmount");
+			const billPaymentPromotion = document.getElementById("billPaymentPromotion");
+			const billPaymentStatus = document.getElementById("billPaymentStatus");
+			const billPaymentSubmitBtn = document.getElementById("billPaymentSubmitBtn");
+			const accountSwitcher = document.getElementById("accountSwitcher");
+			const logoutBtn = document.getElementById("logoutBtn");
+			const cardCarouselViewport = document.getElementById("cardCarouselViewport");
+			const cardCarouselTrack = document.getElementById("cardCarouselTrack");
+			const cardPrevBtn = document.getElementById("cardPrevBtn");
+			const cardNextBtn = document.getElementById("cardNextBtn");
+			const cardCarouselStatus = document.getElementById("cardCarouselStatus");
+
+			const userName = sessionStorage.getItem("vcbUser") || "customer";
+			const fullName = sessionStorage.getItem("vcbFullName") || userName;
+			const cccd = sessionStorage.getItem("vcbCCCD") || "";
+			const primaryAccount = sessionStorage.getItem("vcbAccountNumber") || "";
+			const clearCustomerSession = () => {
+				window.VCBSessionWatchdog.clearCustomerSession();
+			};
+			const invalidateCustomerSession = () => {
+				clearCustomerSession();
+				window.location.replace("index.html");
+			};
+			let personalInfoCache = null;
+			let personalInfoCacheAccount = "";
+			let cardScrollIndex = 0;
+			let selectedAccountNumber = primaryAccount;
+			let currentAccountType = "all";
+			let latestAccounts = [];
+
+			const cardImageByType = {
+				visa: "assets/visa.jpg",
+				master: "assets/Mastercard.png",
+				debit: "assets/VISA_debit.png",
+				credit: "assets/JCB.png",
+				"american express": "assets/American_express.jpg",
+				"visa debit": "assets/VISA_debit.png"
+			};
+
+			welcomeName.textContent = fullName;
+			userCccd.textContent = cccd || "N/A";
+			userPrimaryAccount.textContent = primaryAccount || "N/A";
+
+			logoutBtn.addEventListener("click", () => {
+				clearCustomerSession();
+				window.location.replace("index.html");
+			});
+
+			window.VCBSessionWatchdog.start({
+				intervalMs: 15000,
+				onInvalid: invalidateCustomerSession,
+				validator: async () => {
+					if (!cccd) {
+						return false;
+					}
+
+					const healthResponse = await window.VCBSessionWatchdog.fetchWithTimeout(`${apiBase}/health`, {
+						cache: "no-store"
+					});
+					if (!healthResponse.ok) {
+						return false;
+					}
+
+					const accountResponse = await window.VCBSessionWatchdog.fetchWithTimeout(
+						`${apiBase}/accounts?cccd=${encodeURIComponent(cccd)}`,
+						{ cache: "no-store" }
+					);
+					if (!accountResponse.ok) {
+						return false;
+					}
+
+					const accounts = await accountResponse.json();
+					return Array.isArray(accounts) && accounts.length > 0;
+				}
+			});
+
+			const formatCurrency = (value) =>
+				new Intl.NumberFormat("vi-VN", {
+					style: "currency",
+					currency: "VND",
+					maximumFractionDigits: 0
+				}).format(Number(value || 0));
+
+			const formatDateTime = (raw) => {
+				if (!raw) {
+					return "-";
+				}
+				const dt = new Date(raw);
+				if (Number.isNaN(dt.getTime())) {
+					return "-";
+				}
+				return dt.toLocaleString("vi-VN", {
+					hour12: false,
+					year: "numeric",
+					month: "2-digit",
+					day: "2-digit",
+					hour: "2-digit",
+					minute: "2-digit"
+				});
+			};
+
+			const formatDate = (raw) => {
+				if (!raw) {
+					return "-";
+				}
+				const dt = new Date(raw);
+				if (Number.isNaN(dt.getTime())) {
+					return "-";
+				}
+				return dt.toLocaleDateString("vi-VN", {
+					year: "numeric",
+					month: "2-digit",
+					day: "2-digit"
+				});
+			};
+
+			const formatPercent = (value) => `${(Number(value || 0) * 100).toFixed(2)}%`;
+
+			const toNumber = (value) => {
+				const numeric = Number(value);
+				return Number.isFinite(numeric) ? numeric : 0;
+			};
+
+			const accountHasPayment = (account) =>
+				String(account.account_type || "").toLowerCase() === "payment"
+				|| toNumber(account.So_du) > 0
+				|| toNumber(account.Han_muc) > 0;
+
+			const accountHasSavings = (account) =>
+				String(account.account_type || "").toLowerCase() === "savings"
+				|| toNumber(account.tsk_So_tien) > 0;
+
+			const filterAccountsByType = (accounts, type) => {
+				if (type === "payment") {
+					return accounts.filter(accountHasPayment);
+				}
+				if (type === "savings") {
+					return accounts.filter(accountHasSavings);
+				}
+				return accounts;
+			};
+
+			const updateAccountFilterState = () => {
+				const isAll = currentAccountType === "all";
+				const isPayment = currentAccountType === "payment";
+				const isSavings = currentAccountType === "savings";
+
+				filterAllBtn.classList.toggle("is-active", isAll);
+				filterPaymentBtn.classList.toggle("is-active", isPayment);
+				filterSavingsBtn.classList.toggle("is-active", isSavings);
+
+				if (isPayment) {
+					accountFilterHint.textContent = "Showing payment account products and transfer-ready balances.";
+					return;
+				}
+				if (isSavings) {
+					accountFilterHint.textContent = "Showing savings account products and deposit balances.";
+					return;
+				}
+
+				accountFilterHint.textContent = "Showing all account products.";
+			};
+
+			const getCardImage = (cardType) => {
+				const key = String(cardType || "").trim().toLowerCase();
+				return cardImageByType[key] || "assets/Icon-Vietcombank.png";
+			};
+
+			const formatCardNumber = (cardNumber) => {
+				const digits = String(cardNumber || "").replace(/\s+/g, "").trim();
+				return digits.replace(/(.{4})/g, "$1 ").trim();
+			};
+
+			const updateCardCarouselStatus = (count) => {
+				if (!count) {
+					cardCarouselStatus.textContent = "";
+					return;
+				}
+
+				cardCarouselStatus.textContent = count === 1
+					? "Showing 1 card"
+					: `Showing card ${Math.min(cardScrollIndex + 1, count)} of ${count}`;
+			};
+
+			const updateCardNavState = (count) => {
+				cardPrevBtn.disabled = count <= 1 || cardScrollIndex <= 0;
+				cardNextBtn.disabled = count <= 1 || cardScrollIndex >= count - 1;
+			};
+
+			const renderCards = (cards) => {
+				const cardList = Array.isArray(cards) ? cards : [];
+				if (!cardList.length) {
+					cardCarouselTrack.innerHTML = '<div class="empty-state">No cards linked.</div>';
+					cardScrollIndex = 0;
+					updateCardCarouselStatus(0);
+					updateCardNavState(0);
+					return;
+				}
+
+				cardCarouselTrack.innerHTML = cardList
+					.map((card) => {
+						const expiry = formatDate(card.expiryDate);
+						return `
+							<article class="card-tile">
+								<span class="card-type-badge">${card.cardType || "Card"}</span>
+								<img class="card-tile-image" src="${getCardImage(card.cardType)}" alt="${card.cardType || "Card"} image" />
+								<div class="card-tile-body">
+									<span class="card-label">Card number</span>
+									<strong class="card-number">${formatCardNumber(card.cardNumber)}</strong>
+									<span class="card-expiry">Expiry: ${expiry}</span>
+								</div>
+							</article>
+						`;
+					})
+					.join("");
+
+				cardScrollIndex = 0;
+				cardCarouselViewport.scrollTo({ left: 0, behavior: "auto" });
+				updateCardCarouselStatus(cardList.length);
+				updateCardNavState(cardList.length);
+			};
+
+			const scrollCards = (direction) => {
+				const cardEl = cardCarouselTrack.querySelector(".card-tile");
+				const cardList = cardCarouselTrack.querySelectorAll(".card-tile");
+				const count = cardList.length;
+				if (!cardEl || !count) {
+					return;
+				}
+
+				cardScrollIndex = Math.max(0, Math.min(count - 1, cardScrollIndex + direction));
+				const step = cardEl.getBoundingClientRect().width + 14;
+				cardCarouselViewport.scrollTo({ left: cardScrollIndex * step, behavior: "smooth" });
+				updateCardCarouselStatus(count);
+				updateCardNavState(count);
+			};
+
+
+			const renderAccounts = (accounts, type) => {
+				const visibleAccounts = filterAccountsByType(accounts, type);
+				if (!visibleAccounts.length) {
+					const label = type === "payment" ? "payment" : type === "savings" ? "savings" : "matching";
+					accountList.innerHTML = `<p class="empty-state">No ${label} accounts found for this customer.</p>`;
+					return;
+				}
+
+				accountList.innerHTML = visibleAccounts
+					.map((account) => {
+						const isActive = account.Trang_thai === "Hoat_dong";
+						const hasPayment = accountHasPayment(account);
+						const hasSavings = accountHasSavings(account);
+						const productBadges = [
+							hasPayment ? '<span class="account-product-chip">Payment</span>' : "",
+							hasSavings ? '<span class="account-product-chip">Savings</span>' : ""
+						].filter(Boolean).join("");
+
+						const detailCells = [
+							hasPayment ? `<div><span>Available balance</span><strong>${formatCurrency(account.So_du)}</strong></div>` : "",
+							hasPayment ? `<div><span>Spending limit</span><strong>${formatCurrency(account.Han_muc)}</strong></div>` : "",
+							hasSavings ? `<div><span>Savings balance</span><strong>${formatCurrency(account.tsk_So_tien)}</strong></div>` : "",
+							hasSavings ? `<div><span>Interest / term</span><strong>${formatPercent(account.Lai_suat)} · ${account.Ky_han || 0} months</strong></div>` : ""
+						].filter(Boolean).join("");
+
+						return `
+							<article class="account-card">
+								<div class="account-row">
+									<strong>${account.So_tai_khoan}</strong>
+									<span class="status-badge ${isActive ? "ok" : "off"}">${account.Trang_thai || "Unknown"}</span>
+								</div>
+								<div class="account-row muted-row">${account.Ten_khach_hang || "-"}</div>
+								<div class="account-product-tags">${productBadges || '<span class="account-product-chip">Standard</span>'}</div>
+								<div class="account-grid">${detailCells}</div>
+							</article>
+						`;
+					})
+					.join("");
+			};
+
+			const refreshAccountScopeView = async (accounts) => {
+				const paymentAccounts = accounts.filter(accountHasPayment);
+				renderAccounts(accounts, currentAccountType);
+				updateAccountSwitcher(paymentAccounts);
+				const selectedPayment = applySelectedAccountSummary(accounts, paymentAccounts);
+				await refreshPersonalInfoView();
+				const txCount = await loadTransactionsForAccount(selectedPayment ? selectedAccountNumber : "");
+				return { txCount, selectedPayment, paymentAccounts };
+			};
+
+			const setAccountTypeFilter = async (type) => {
+				currentAccountType = type;
+				updateAccountFilterState();
+
+				if (!latestAccounts.length) {
+					return;
+				}
+
+				try {
+					const { txCount, selectedPayment } = await refreshAccountScopeView(latestAccounts);
+					const selectedLabel = selectedPayment ? selectedAccountNumber : "N/A";
+					dataStatus.textContent = `Showing ${latestAccounts.length} account(s). Scope: ${currentAccountType}. Selected payment account: ${selectedLabel} (${txCount} recent transaction(s)).`;
+				} catch (error) {
+					dataStatus.textContent = "Unable to switch account scope right now. Please try again.";
+				}
+			};
+
+			filterAllBtn.addEventListener("click", () => {
+				void setAccountTypeFilter("all");
+			});
+
+			filterPaymentBtn.addEventListener("click", () => {
+				void setAccountTypeFilter("payment");
+			});
+
+			filterSavingsBtn.addEventListener("click", () => {
+				void setAccountTypeFilter("savings");
+			});
+
+			updateAccountFilterState();
+
+			const renderTransactions = (transactions) => {
+				if (!transactions.length) {
+					transactionRows.innerHTML = '<tr><td colspan="5" class="empty-cell">No transactions found.</td></tr>';
+					latestTransaction.textContent = "-";
+					latestTransactionTime.textContent = "-";
+					return;
+				}
+
+				transactionRows.innerHTML = transactions
+					.map(
+						(item) => `
+							<tr>
+								<td>${item.Ma_giao_dich}</td>
+								<td>${formatCurrency(item.So_tien)}</td>
+								<td>${formatCurrency(item.Phi_chuyen_tien)}</td>
+								<td>${item.Ten_khuyen_mai ? `${item.Ten_khuyen_mai} (${formatCurrency(item.Tong_tien_khuyen_mai)})` : "-"}</td>
+								<td>${formatDateTime(item.Ngay_gio)}</td>
+							</tr>
+						`
+					)
+					.join("");
+
+				latestTransaction.textContent = transactions[0].Ma_giao_dich || "-";
+				latestTransactionTime.textContent = formatDateTime(transactions[0].Ngay_gio);
+			};
+
+			const renderLoans = (loans) => {
+				if (!Array.isArray(loans) || !loans.length) {
+					loanRows.innerHTML = '<tr><td colspan="7" class="empty-cell">No loans found.</td></tr>';
+					return;
+				}
+
+				loanRows.innerHTML = loans
+					.map(
+						(item) => `
+							<tr>
+								<td>${item.Ma_khoan_vay || "-"}</td>
+								<td>${formatCurrency(item.Khoan_vay)}</td>
+								<td>${formatPercent(item.Lai_suat)}</td>
+								<td>${item.Thoi_han_vay ?? "-"}</td>
+								<td>${item.Ky_han_tra_goc ?? "-"}</td>
+								<td>${item.Trang_thai || "-"}</td>
+								<td>${item.So_tai_khoan || "-"}</td>
+							</tr>
+						`
+					)
+					.join("");
+			};
+
+			const renderLoanRepayments = (repayments) => {
+				if (!Array.isArray(repayments) || !repayments.length) {
+					loanPaymentRows.innerHTML = '<tr><td colspan="3" class="empty-cell">No loan repayments found.</td></tr>';
+					return;
+				}
+
+				// Group repayments by loan ID
+				const loanMap = {};
+				repayments.forEach(item => {
+					const loanId = item.Ma_khoan_vay;
+					if (!loanMap[loanId]) {
+						loanMap[loanId] = {
+							loanId,
+							repayments: []
+						};
+					}
+					loanMap[loanId].repayments.push(item);
+				});
+
+				// Determine status for each loan and keep only a clean summary row.
+				const loanSummary = Object.values(loanMap).map((loan) => {
+					const allPaid = loan.repayments.every((r) => r.Trang_thai === "Da_thanh_toan");
+					return {
+						loanId: loan.loanId,
+						status: allPaid ? "Da_thanh_toan" : "Cho_thanh_toan",
+					};
+				});
+
+				loanPaymentRows.innerHTML = loanSummary
+					.map(
+						(loan) => `
+							<tr>
+								<td>${loan.loanId || "-"}</td>
+								<td>${loan.status || "-"}</td>
+								<td>${loan.status === "Da_thanh_toan" ? "-" : `<button class="home-nav-button repay-loan-btn" type="button" data-loan-id="${loan.loanId}">View Repayment Plan</button>`}</td>
+							<td><button class="home-nav-button details-btn" type="button" data-loan-id="${loan.loanId}">View Details</button></td>
+						</tr>
+					`
+				)
+				.join("");
+
+			// Store all repayments for modal use
+			window.allRepayments = repayments;
+			loanPaymentRows.querySelectorAll(".repay-loan-btn").forEach((button) => {
+				button.addEventListener("click", () => {
+					const loanId = button.getAttribute("data-loan-id");
+					if (loanId) {
+						showRepaymentPlan(loanId, repayments);
+					}
+				});
+			});
+			loanPaymentRows.querySelectorAll(".details-btn").forEach((button) => {
+				button.addEventListener("click", () => {
+					const loanId = button.getAttribute("data-loan-id");
+					if (loanId) {
+						showRepaymentDetails(loanId, repayments);
+					}
+				});
+			});
+		};
+
+			const showRepaymentDetails = (loanId, allRepayments) => {
+				const loanRepayments = allRepayments.filter(r => r.Ma_khoan_vay === loanId);
+				
+				if (!loanRepayments.length) {
+					repaymentDetailsContent.innerHTML = '<p class="empty-state">No repayments found for this loan.</p>';
+				} else {
+					// Build a summary table of all attributes
+					const detailsHtml = `
+						<table class="details-table">
+							<thead>
+								<tr>
+									<th>Payment ID</th>
+									<th>Due Date</th>
+									<th>Paid Date</th>
+									<th>Interest Rate</th>
+									<th>Principal</th>
+									<th>Paid Amount</th>
+									<th>Penalty</th>
+									<th>Status</th>
+									<th>Transaction ID</th>
+								</tr>
+							</thead>
+							<tbody>
+								${loanRepayments.map(item => `
+									<tr>
+										<td>${item.Ma_thanh_toan || "-"}</td>
+										<td>${formatDate(item.Ngay_tra_du_kien)}</td>
+										<td>${formatDate(item.Ngay_tra_thuc_te)}</td>
+										<td>${formatPercent(item.Lai_suat)}</td>
+										<td>${formatCurrency(item.So_tien_goc)}</td>
+										<td>${formatCurrency(item.So_tien_da_tra)}</td>
+										<td>${formatCurrency(item.Phi_phat)}</td>
+										<td>${item.Trang_thai || "-"}</td>
+										<td>${item.Ma_giao_dich || "-"}</td>
+									</tr>
+								`).join("")}
+							</tbody>
+						</table>
+					`;
+					repaymentDetailsContent.innerHTML = detailsHtml;
+				}
+				
+				repaymentDetailsModal.classList.add("open");
+				repaymentDetailsModal.setAttribute("aria-hidden", "false");
+			};
+
+			const showRepaymentPlan = (loanId, allRepayments) => {
+				const loanRepayments = allRepayments.filter(r => r.Ma_khoan_vay === loanId);
+				const refreshPlan = async () => {
+					await loadData();
+					showRepaymentPlan(loanId, window.allRepayments);
+				};
+				
+				if (!loanRepayments.length) {
+					repaymentDetailRows.innerHTML = '<tr><td colspan="8" class="empty-cell">No repayment schedule found.</td></tr>';
+				} else {
+					repaymentDetailRows.innerHTML = loanRepayments
+						.map(
+							(item) => `
+								<tr>
+									<td>${item.Ma_thanh_toan || "-"}</td>
+									<td>${formatDate(item.Ngay_tra_du_kien)}</td>
+									<td>${formatDate(item.Ngay_tra_thuc_te)}</td>
+									<td>${formatPercent(item.Lai_suat)}</td>
+									<td>${formatCurrency(item.So_tien_goc)}</td>
+									<td>${formatCurrency(item.So_tien_con_lai)}</td>
+									<td>${item.Trang_thai || "-"}</td>
+									<td>${item.Trang_thai === "Da_thanh_toan" ? "-" : `<button class="home-nav-button repay-btn" type="button" data-repayment-id="${item.Ma_thanh_toan}">Repay</button>`}</td>
+								</tr>
+							`
+						)
+						.join("");
+
+					// Attach repay event listeners
+					repaymentDetailRows.querySelectorAll(".repay-btn").forEach((button) => {
+						button.addEventListener("click", async () => {
+							const repaymentId = button.getAttribute("data-repayment-id") || "";
+							if (!repaymentId) {
+								return;
+							}
+
+							button.disabled = true;
+							try {
+								const response = await fetch(`${apiBase}/repayments/pay`, {
+									method: "POST",
+									headers: { "Content-Type": "application/json" },
+									body: JSON.stringify({ cccd, repaymentId })
+								});
+								const payload = await response.json();
+								if (!response.ok) {
+									dataStatus.textContent = payload.message || "Repayment failed.";
+									return;
+								}
+
+								if (payload.repaymentStatus === "Da_thanh_toan") {
+									await refreshPlan();
+								} else {
+									await loadData();
+									showRepaymentPlan(loanId, window.allRepayments);
+								}
+								dataStatus.textContent = `Repayment success for ${repaymentId}. Remaining: ${formatCurrency(payload.remainingAmount)}.`;
+							} catch (error) {
+								dataStatus.textContent = "Cannot connect to API for repayment.";
+							} finally {
+								button.disabled = false;
+							}
+						});
+					});
+				}
+				
+				repaymentPlanModal.classList.add("open");
+				repaymentPlanModal.setAttribute("aria-hidden", "false");
+			};
+
+			const loadLoans = async () => {
+				const loanResponse = await fetch(`${apiBase}/loans?cccd=${encodeURIComponent(cccd)}`);
+				if (!loanResponse.ok) {
+					throw new Error("Failed to load loans");
+				}
+
+				const loanPayload = await loanResponse.json();
+				const loans = Array.isArray(loanPayload.loans) ? loanPayload.loans : [];
+				const repayments = Array.isArray(loanPayload.repayments) ? loanPayload.repayments : [];
+
+				renderLoans(loans);
+				renderLoanRepayments(repayments);
+				return { loanCount: loans.length, repaymentCount: repayments.length };
+			};
+
+			const renderBills = (bills) => {
+				if (!Array.isArray(bills) || !bills.length) {
+					billRows.innerHTML = '<tr><td colspan="6" class="empty-cell">No bills found.</td></tr>';
+					return;
+				}
+
+				billRows.innerHTML = bills
+					.map((item) => {
+						const canPay = !item.Ma_giao_dich;
+						return `
+							<tr>
+								<td>${item.Ma_hoa_don || "-"}</td>
+								<td>${item.Loai_hoa_don || "-"}</td>
+								<td>${formatCurrency(item.So_tien_thanh_toan)}</td>
+								<td>${item.So_tai_khoan || "-"}</td>
+								<td>${item.Ma_giao_dich || "-"}</td>
+								<td>${canPay ? `<button class="home-nav-button pay-bill-btn" type="button" data-bill-id="${item.Ma_hoa_don}" data-bill-amount="${item.So_tien_thanh_toan}">Pay</button>` : "-"}</td>
+							</tr>
+						`;
+					})
+					.join("");
+
+				billRows.querySelectorAll(".pay-bill-btn").forEach((button) => {
+					button.addEventListener("click", async () => {
+						const billId = button.getAttribute("data-bill-id") || "";
+						const billAmount = button.getAttribute("data-bill-amount") || "0";
+						if (!billId) {
+							return;
+						}
+
+						billPaymentBillId.textContent = billId;
+						billPaymentAmount.textContent = formatCurrency(billAmount);
+						billPaymentPromotion.value = "";
+						billPaymentStatus.textContent = "";
+						billPaymentForm.dataset.billId = billId;
+
+						await loadBillPromotions();
+						billPaymentModal.classList.add("open");
+						billPaymentModal.setAttribute("aria-hidden", "false");
+					});
+				});
+			};
+
+			const loadBills = async () => {
+				const response = await fetch(`${apiBase}/bills?cccd=${encodeURIComponent(cccd)}`);
+				if (!response.ok) {
+					throw new Error("Failed to load bills");
+				}
+				const bills = await response.json();
+				renderBills(bills);
+				return Array.isArray(bills) ? bills.length : 0;
+			};
+
+			const renderPromotionHistory = (promos) => {
+				if (!Array.isArray(promos) || !promos.length) {
+					promoHistoryRows.innerHTML = '<tr><td colspan="6" class="empty-cell">No promotion history found.</td></tr>';
+					return;
+				}
+
+				promoHistoryRows.innerHTML = promos
+					.map((item) => {
+						const startDate = formatDate(item.Ngay_bat_dau);
+						const endDate = formatDate(item.Ngay_ket_thuc);
+						const assignDate = formatDate(item.Ngay_gan_nhat);
+						const adminName = item.Ten_admin || "-";
+						return `
+							<tr>
+								<td>${item.Ma || "-"}</td>
+								<td>${item.Ten_chuong_trinh || "-"}</td>
+								<td>${startDate}</td>
+								<td>${endDate}</td>
+								<td>${adminName}</td>
+								<td>${assignDate}</td>
+							</tr>
+						`;
+					})
+					.join("");
+			};
+
+			const loadPromotionHistory = async () => {
+				const response = await fetch(`${apiBase}/promotions/history?cccd=${encodeURIComponent(cccd)}`);
+				if (!response.ok) {
+					throw new Error("Failed to load promotion history");
+				}
+				const promos = await response.json();
+				renderPromotionHistory(promos);
+				return Array.isArray(promos) ? promos.length : 0;
+			};
+
+			const formatVndNumber = (num) => {
+				return new Intl.NumberFormat("en-US").format(num);
+			};
+
+			const loadBillPromotions = async () => {
+				try {
+					const response = await fetch(`${apiBase}/promotions?feature=bill`);
+					if (!response.ok) {
+						throw new Error("Failed to load promotions");
+					}
+
+					const promotions = await response.json();
+					if (!Array.isArray(promotions) || !promotions.length) {
+						billPaymentPromotion.innerHTML = '<option value="">No promotion available</option>';
+						return;
+					}
+
+					billPaymentPromotion.innerHTML = [
+						'<option value="">No promotion</option>',
+						...promotions.map((item) => {
+							const minAmount = formatVndNumber(Number(item.So_tien_toi_thieu || 0));
+							const valueAmount = formatVndNumber(Number(item.So_tien_khuyen_mai || 0));
+							const remaining = Number(item.So_luong || 0);
+							const title = item.Ten_chuong_trinh || item.Ma;
+							return `<option value="${item.Ma}">${item.Ma} - ${title} (min ${minAmount} VND, value ${valueAmount} VND, left ${remaining})</option>`;
+						})
+					].join("");
+				} catch (error) {
+					billPaymentPromotion.innerHTML = '<option value="">No promotion available</option>';
+				}
+			};
+
+			runAutoDebitBtn.addEventListener("click", async () => {
+				runAutoDebitBtn.disabled = true;
+				try {
+					const response = await fetch(`${apiBase}/repayments/auto-debit`, {
+						method: "POST",
+						headers: { "Content-Type": "application/json" },
+						body: JSON.stringify({ cccd })
+					});
+					const payload = await response.json();
+					if (!response.ok) {
+						dataStatus.textContent = payload.message || "Auto-debit failed.";
+						return;
+					}
+
+					await loadData();
+					dataStatus.textContent = `Auto-debit: processed ${payload.processed}, paid ${payload.paid}, overdue ${payload.overdue}, failed ${payload.failed}.`;
+				} catch (error) {
+					dataStatus.textContent = "Cannot connect to API for auto-debit.";
+				} finally {
+					runAutoDebitBtn.disabled = false;
+				}
+			});
+
+			const findAccountByNumber = (accounts, accountNumber) =>
+				accounts.find((account) => String(account.So_tai_khoan) === String(accountNumber));
+
+			const updateAccountSwitcher = (accounts) => {
+				if (!accountSwitcher) {
+					return;
+				}
+
+				if (!Array.isArray(accounts) || !accounts.length) {
+					accountSwitcher.innerHTML = '<option value="">No payment account</option>';
+					accountSwitcher.disabled = true;
+					return;
+				}
+
+				accountSwitcher.innerHTML = accounts
+					.map((account) => {
+						const accountNumber = String(account.So_tai_khoan || "");
+						const status = account.Trang_thai === "Hoat_dong" ? "Active" : "Inactive";
+						return `<option value="${accountNumber}">${accountNumber} (${status}, payment)</option>`;
+					})
+					.join("");
+
+				const selected = findAccountByNumber(accounts, selectedAccountNumber)
+					|| findAccountByNumber(accounts, primaryAccount)
+					|| accounts[0];
+
+				selectedAccountNumber = String(selected.So_tai_khoan || "");
+				accountSwitcher.value = selectedAccountNumber;
+				accountSwitcher.disabled = accounts.length === 1;
+			};
+
+			const applySelectedAccountSummary = (accounts, paymentAccounts) => {
+				if (!accounts.length) {
+					totalBalance.textContent = "Unavailable";
+					totalLimit.textContent = "-";
+					return null;
+				}
+
+				if (currentAccountType === "savings") {
+					const savingsAccounts = accounts.filter(accountHasSavings);
+					if (savingsAccounts.length) {
+						const selectedSavings = findAccountByNumber(savingsAccounts, selectedAccountNumber)
+							|| findAccountByNumber(savingsAccounts, primaryAccount)
+							|| savingsAccounts[0];
+						selectedAccountNumber = String(selectedSavings.So_tai_khoan || "");
+						totalBalance.textContent = formatCurrency(selectedSavings.tsk_So_tien || selectedSavings.So_du);
+						totalLimit.textContent = "N/A";
+						return null;
+					}
+				}
+
+				if (!paymentAccounts.length) {
+					const fallback = findAccountByNumber(accounts, selectedAccountNumber)
+						|| findAccountByNumber(accounts, primaryAccount)
+						|| accounts[0];
+					selectedAccountNumber = String(fallback.So_tai_khoan || "");
+					totalBalance.textContent = formatCurrency(fallback.tsk_So_tien || fallback.So_du);
+					totalLimit.textContent = "N/A";
+					return null;
+				}
+
+				const selected = findAccountByNumber(paymentAccounts, selectedAccountNumber)
+					|| findAccountByNumber(paymentAccounts, primaryAccount)
+					|| paymentAccounts[0];
+
+				selectedAccountNumber = String(selected.So_tai_khoan || "");
+				totalBalance.textContent = formatCurrency(selected.So_du);
+				totalLimit.textContent = formatCurrency(selected.Han_muc);
+
+				return selected;
+			};
+
+			const loadTransactionsForAccount = async (accountNumber) => {
+				if (!accountNumber) {
+					renderTransactions([]);
+					dataStatus.textContent = "Connected. No payment account available for transaction history.";
+					return 0;
+				}
+
+				const txResponse = await fetch(
+					`${apiBase}/transactions?accountNumber=${encodeURIComponent(accountNumber)}`
+				);
+				if (!txResponse.ok) {
+					throw new Error("Failed to load transactions");
+				}
+
+				const transactions = await txResponse.json();
+				renderTransactions(transactions);
+				return transactions.length;
+			};
+
+			const renderPersonalInfo = (info) => {
+				piName.textContent = info.fullName || fullName || "-";
+				piCccd.textContent = info.cccd || "-";
+				piGender.textContent = info.gender || "-";
+				piDob.textContent = formatDate(info.dob);
+				piPhone.textContent = (info.phones || []).join(", ") || "-";
+				piEmail.textContent = (info.emails || []).join(", ") || "-";
+				piReferrer.textContent = info.referrerCccd || "-";
+
+				const cardTypes = Array.isArray(info.cardTypes) ? info.cardTypes : [];
+				if (!cardTypes.length) {
+					piCardTypes.innerHTML = '<span class="empty-state">No card linked</span>';
+				} else {
+					piCardTypes.innerHTML = cardTypes
+						.map((card) => `<span class="mini-chip">${card}</span>`)
+						.join("");
+				}
+
+				renderCards(info.cards || []);
+			};
+
+			const fetchPersonalInfo = async (accountNumber) => {
+				const cacheAccount = String(accountNumber || "");
+				if (personalInfoCache && personalInfoCacheAccount === cacheAccount) {
+					return personalInfoCache;
+				}
+
+				const query = new URLSearchParams({ cccd });
+				if (cacheAccount) {
+					query.set("accountNumber", cacheAccount);
+				}
+
+				const infoResponse = await fetch(`${apiBase}/personal-info?${query.toString()}`);
+				if (!infoResponse.ok) {
+					throw new Error("Failed to load personal information");
+				}
+
+				personalInfoCache = await infoResponse.json();
+				personalInfoCacheAccount = cacheAccount;
+				return personalInfoCache;
+			};
+
+			const refreshPersonalInfoView = async () => {
+				const info = await fetchPersonalInfo(selectedAccountNumber);
+				renderPersonalInfo(info);
+				return info;
+			};
+
+			const openModal = () => {
+				personalInfoModal.classList.add("open");
+				personalInfoModal.setAttribute("aria-hidden", "false");
+			};
+
+			const closeModal = () => {
+				personalInfoModal.classList.remove("open");
+				personalInfoModal.setAttribute("aria-hidden", "true");
+			};
+
+			openPersonalInfoBtn.addEventListener("click", async () => {
+				if (!cccd) {
+					dataStatus.textContent = "No CCCD found in session. Please login again.";
+					return;
+				}
+
+				if (!personalInfoCache) {
+					try {
+						await refreshPersonalInfoView();
+					} catch (error) {
+						personalInfoCache = null;
+						personalInfoCacheAccount = "";
+						piName.textContent = fullName || "-";
+						piCccd.textContent = cccd || "-";
+						piGender.textContent = "-";
+						piDob.textContent = "-";
+						piPhone.textContent = "-";
+						piEmail.textContent = "-";
+						piReferrer.textContent = "-";
+						piCardTypes.innerHTML = '<span class="empty-state error">Cannot load card data</span>';
+						renderCards([]);
+					}
+				}
+
+				openModal();
+			});
+
+			closePersonalInfoBtn.addEventListener("click", closeModal);
+			closeRepaymentPlanBtn.addEventListener("click", () => {
+				repaymentPlanModal.classList.remove("open");
+				repaymentPlanModal.setAttribute("aria-hidden", "true");
+			});
+			closeRepaymentDetailsBtn.addEventListener("click", () => {
+				repaymentDetailsModal.classList.remove("open");
+				repaymentDetailsModal.setAttribute("aria-hidden", "true");
+			});
+			closeBillPaymentBtn.addEventListener("click", () => {
+				billPaymentModal.classList.remove("open");
+				billPaymentModal.setAttribute("aria-hidden", "true");
+			});
+			billPaymentForm.addEventListener("submit", async (event) => {
+				event.preventDefault();
+				const billId = billPaymentForm.dataset.billId || "";
+				const promotionCode = billPaymentPromotion.value.trim();
+
+				if (!billId || !cccd) {
+					billPaymentStatus.textContent = "Invalid bill ID or session.";
+					return;
+				}
+
+				billPaymentSubmitBtn.disabled = true;
+				try {
+					const response = await fetch(`${apiBase}/bills/pay`, {
+						method: "POST",
+						headers: { "Content-Type": "application/json" },
+						body: JSON.stringify({
+							cccd,
+							billId,
+							promotionCode: promotionCode || undefined
+						})
+					});
+					const payload = await response.json();
+					if (!response.ok) {
+						billPaymentStatus.textContent = payload.message || "Bill payment failed.";
+						return;
+					}
+
+					billPaymentModal.classList.remove("open");
+					billPaymentModal.setAttribute("aria-hidden", "true");
+					await loadData();
+					dataStatus.textContent = `Bill ${billId} paid successfully. Transaction: ${payload.transactionId || "-"}.`;
+				} catch (error) {
+					billPaymentStatus.textContent = "Cannot connect to API for bill payment.";
+				} finally {
+					billPaymentSubmitBtn.disabled = false;
+				}
+			});
+			cardPrevBtn.addEventListener("click", () => scrollCards(-1));
+			cardNextBtn.addEventListener("click", () => scrollCards(1));
+			cardCarouselViewport.addEventListener("scroll", () => {
+				const cardEl = cardCarouselTrack.querySelector(".card-tile");
+				const count = cardCarouselTrack.querySelectorAll(".card-tile").length;
+				if (!cardEl || !count) {
+					return;
+				}
+
+				const step = cardEl.getBoundingClientRect().width + 14;
+				cardScrollIndex = Math.max(0, Math.min(count - 1, Math.round(cardCarouselViewport.scrollLeft / step)));
+				updateCardCarouselStatus(count);
+				updateCardNavState(count);
+			});
+			personalInfoModal.addEventListener("click", (event) => {
+				if (event.target === personalInfoModal) {
+					closeModal();
+				}
+			});
+
+			document.addEventListener("keydown", (event) => {
+				if (event.key === "Escape" && personalInfoModal.classList.contains("open")) {
+					closeModal();
+				}
+			});
+
+			const loadData = async () => {
+				if (!cccd) {
+					dataStatus.textContent = "No CCCD found in session. Please login again.";
+					return;
+				}
+
+				try {
+					const accountResponse = await fetch(`${apiBase}/accounts?cccd=${encodeURIComponent(cccd)}`);
+					if (!accountResponse.ok) {
+						throw new Error("Failed to load accounts");
+					}
+
+					const accounts = await accountResponse.json();
+					if (!Array.isArray(accounts) || !accounts.length) {
+						invalidateCustomerSession();
+						return;
+					}
+					latestAccounts = accounts;
+
+					const activeAccounts = accounts.filter((account) => account.Trang_thai === "Hoat_dong");
+					activeAccountCount.textContent = String(activeAccounts.length);
+					const { txCount, selectedPayment } = await refreshAccountScopeView(accounts);
+					const loanStats = await loadLoans();
+					const billCount = await loadBills();
+					const promoCount = await loadPromotionHistory();
+					const selectedLabel = selectedPayment ? selectedAccountNumber : "N/A";
+					dataStatus.textContent = `Showing ${accounts.length} account(s). Scope: ${currentAccountType}. Selected payment account: ${selectedLabel} (${txCount} recent transaction(s)). Loans: ${loanStats.loanCount}, repayments: ${loanStats.repaymentCount}, bills: ${billCount}, promos: ${promoCount}.`;
+				} catch (error) {
+					personalInfoCache = null;
+					personalInfoCacheAccount = "";
+					piName.textContent = fullName || "-";
+					piCccd.textContent = cccd || "-";
+					piGender.textContent = "-";
+					piDob.textContent = "-";
+					piPhone.textContent = "-";
+					piEmail.textContent = "-";
+					piReferrer.textContent = "-";
+					piCardTypes.innerHTML = '<span class="empty-state error">Cannot load card data</span>';
+					renderCards([]);
+					totalBalance.textContent = "Unavailable";
+					activeAccountCount.textContent = "-";
+					totalLimit.textContent = "-";
+					accountList.innerHTML = '<p class="empty-state error">Cannot load accounts from API.</p>';
+					transactionRows.innerHTML = '<tr><td colspan="5" class="empty-cell">Cannot load transactions.</td></tr>';
+					loanRows.innerHTML = '<tr><td colspan="7" class="empty-cell">Cannot load loans.</td></tr>';
+					loanPaymentRows.innerHTML = '<tr><td colspan="3" class="empty-cell">Cannot load repayments.</td></tr>';
+					billRows.innerHTML = '<tr><td colspan="6" class="empty-cell">Cannot load bills.</td></tr>';
+					promoHistoryRows.innerHTML = '<tr><td colspan="6" class="empty-cell">Cannot load promotions.</td></tr>';
+					latestTransaction.textContent = "-";
+					latestTransactionTime.textContent = "-";
+					if (accountSwitcher) {
+						accountSwitcher.innerHTML = '<option value="">No payment account</option>';
+						accountSwitcher.disabled = true;
+					}
+					dataStatus.textContent = "API connection failed. Start backend server and verify database connection.";
+				}
+			};
+
+			accountSwitcher.addEventListener("change", async () => {
+				selectedAccountNumber = accountSwitcher.value || "";
+				try {
+					const accountResponse = await fetch(`${apiBase}/accounts?cccd=${encodeURIComponent(cccd)}`);
+					if (!accountResponse.ok) {
+						throw new Error("Failed to refresh accounts");
+					}
+
+					const accounts = await accountResponse.json();
+					if (!Array.isArray(accounts) || !accounts.length) {
+						invalidateCustomerSession();
+						return;
+					}
+
+					latestAccounts = accounts;
+					const { txCount, selectedPayment } = await refreshAccountScopeView(accounts);
+					const billCount = await loadBills();
+					const promoCount = await loadPromotionHistory();
+					const selectedLabel = selectedPayment ? selectedAccountNumber : "N/A";
+					dataStatus.textContent = `Showing ${accounts.length} account(s). Scope: ${currentAccountType}. Selected payment account: ${selectedLabel} (${txCount} recent transaction(s)). Bills: ${billCount}, promos: ${promoCount}.`;
+				} catch (error) {
+					personalInfoCache = null;
+					personalInfoCacheAccount = "";
+					dataStatus.textContent = "Unable to switch account view right now. Please try again.";
+				}
+			});
+
+			loadData();
+
+			const heroAnchorLinks = document.querySelectorAll(".hero-actions a[href^='#']");
+			const prefersReducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+			heroAnchorLinks.forEach((link) => {
+				link.addEventListener("click", (event) => {
+					const hash = link.getAttribute("href");
+					if (!hash) {
+						return;
+					}
+
+					const target = document.querySelector(hash);
+					if (!target) {
+						return;
+					}
+
+					event.preventDefault();
+
+					const targetTop = target.getBoundingClientRect().top + window.scrollY - 16;
+					if (prefersReducedMotion) {
+						window.scrollTo(0, targetTop);
+					} else {
+						window.scrollTo({ top: targetTop, behavior: "smooth" });
+					}
+
+					target.classList.remove("anchor-focus");
+					void target.offsetWidth;
+					target.classList.add("anchor-focus");
+
+					window.setTimeout(() => {
+						target.classList.remove("anchor-focus");
+					}, 900);
+
+					history.replaceState(null, "", hash);
+				});
+			});
+		});
+	</script>
+</body>
+</html>

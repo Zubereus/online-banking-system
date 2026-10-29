@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8" />
+	<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+	<title>Stock Monitoring</title>
+	<link rel="preconnect" href="https://fonts.googleapis.com" />
+	<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+	<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=Manrope:wght@500;700;800&display=swap" rel="stylesheet" />
+	<link rel="stylesheet" href="../styles.css" />
+	<script src="../auth-watchdog.js"></script>
+	<script>
+		if (sessionStorage.getItem("vcbAuthenticated") !== "true") {
+			location.replace("../index.html");
+		}
+	</script>
+</head>
+<body>
+	<div class="orb one"></div>
+	<div class="orb two"></div>
+
+	<main class="card">
+		<header class="topbar" id="topbar">
+			<div class="brand">Utility: Stock Monitoring</div>
+			<button class="menu-toggle" id="menuToggle" aria-label="Toggle menu" aria-expanded="false" aria-controls="dropdownMenu">
+				<span class="menu-icon" aria-hidden="true">
+					<span></span>
+					<span></span>
+					<span></span>
+				</span>
+			</button>
+			<nav class="dropdown" id="dropdownMenu" aria-label="Main menu">
+				<a href="../home.html">Home</a>
+				<a href="index.html">Utilities</a>
+				<a href="weather.html">Weather Utility</a>
+				<a href="exchange.html">Exchange Utility</a>
+				<a href="stock.html">Stock Monitor</a>
+				<a href="loan-emi.html">Loan EMI</a>
+			</nav>
+		</header>
+
+		<section class="hero">
+			<span class="badge">New Utility Page</span>
+			<h1>Stock Monitoring</h1>
+			<p>Check a symbol quote and build a lightweight watchlist for repeated tracking.</p>
+		</section>
+
+		<section class="grid stock-grid">
+			<article class="panel big">
+				<h2>Lookup by Symbol</h2>
+				<p class="muted">Examples: AAPL, MSFT, NVDA, TSLA, or NASDAQ:AAPL</p>
+				<form id="stockForm" class="stock-form">
+					<input id="stockInput" class="stock-input" type="text" name="symbol" placeholder="Enter symbol" required />
+					<button class="primary" type="submit">Load Chart</button>
+				</form>
+				<div class="stock-output" id="stockOutput">Enter a symbol to load the live chart.</div>
+				<h2 class="stock-subtitle">Quick Symbols</h2>
+				<p class="muted">Tap to switch chart quickly:</p>
+				<div class="stock-quicklist" id="stockQuicklist">
+					<button class="secondary stock-chip" data-symbol="NASDAQ:AAPL" type="button">AAPL</button>
+					<button class="secondary stock-chip" data-symbol="NASDAQ:MSFT" type="button">MSFT</button>
+					<button class="secondary stock-chip" data-symbol="NASDAQ:NVDA" type="button">NVDA</button>
+					<button class="secondary stock-chip" data-symbol="NASDAQ:TSLA" type="button">TSLA</button>
+					<button class="secondary stock-chip" data-symbol="NASDAQ:AMZN" type="button">AMZN</button>
+				</div>
+				<div class="stock-chart-wrap" id="stockChartWrap">
+					<iframe
+						id="stockChart"
+						title="Live stock chart"
+						class="stock-chart"
+						loading="lazy"
+						referrerpolicy="no-referrer-when-downgrade"
+					></iframe>
+				</div>
+			</article>
+		</section>
+	</main>
+
+	<script>
+		const topbar = document.getElementById("topbar");
+		const menuToggle = document.getElementById("menuToggle");
+		const stockForm = document.getElementById("stockForm");
+		const stockInput = document.getElementById("stockInput");
+		const stockOutput = document.getElementById("stockOutput");
+		const stockChart = document.getElementById("stockChart");
+		const stockQuicklist = document.getElementById("stockQuicklist");
+		const apiBase = window.location.origin.startsWith("http")
+			? `${window.location.origin}/api`
+			: "http://localhost:8080/api";
+		const cccd = sessionStorage.getItem("vcbCCCD") || "";
+
+		window.VCBSessionWatchdog.start({
+			intervalMs: 15000,
+			onInvalid: () => {
+				window.VCBSessionWatchdog.clearCustomerSession();
+				window.location.replace("../index.html");
+			},
+			validator: async () => {
+				if (!cccd) {
+					return false;
+				}
+
+				const healthResponse = await window.VCBSessionWatchdog.fetchWithTimeout(`${apiBase}/health`, {
+					cache: "no-store"
+				});
+				if (!healthResponse.ok) {
+					return false;
+				}
+
+				const accountResponse = await window.VCBSessionWatchdog.fetchWithTimeout(
+					`${apiBase}/accounts?cccd=${encodeURIComponent(cccd)}`,
+					{ cache: "no-store" }
+				);
+				if (!accountResponse.ok) {
+					return false;
+				}
+
+				const accounts = await accountResponse.json();
+				return Array.isArray(accounts) && accounts.length > 0;
+			}
+		});
+
+		menuToggle.addEventListener("click", () => {
+			const isOpen = topbar.classList.toggle("menu-open");
+			menuToggle.setAttribute("aria-expanded", String(isOpen));
+		});
+
+		document.addEventListener("click", (event) => {
+			if (!topbar.contains(event.target)) {
+				topbar.classList.remove("menu-open");
+				menuToggle.setAttribute("aria-expanded", "false");
+			}
+		});
+
+		function normalizeSymbol(input) {
+			const cleaned = String(input || "").trim().toUpperCase();
+			if (!cleaned) {
+				return "NASDAQ:AAPL";
+			}
+
+			if (cleaned.includes(":")) {
+				return cleaned;
+			}
+
+			return "NASDAQ:" + cleaned;
+		}
+
+		function buildTradingViewUrl(symbol) {
+			const params = new URLSearchParams({
+				symbol,
+				interval: "5",
+				hidetrading: "1",
+				hidesidetoolbar: "1",
+				hidetoptoolbar: "0",
+				theme: "light",
+				style: "1",
+				timezone: "Asia/Ho_Chi_Minh",
+				withdateranges: "1",
+				allow_symbol_change: "1",
+				save_image: "0",
+				hideideas: "1",
+				studies: ""
+			});
+
+			return "https://s.tradingview.com/widgetembed/?" + params.toString();
+		}
+
+		function loadChart(symbolInput) {
+			const symbol = normalizeSymbol(symbolInput);
+			stockChart.src = buildTradingViewUrl(symbol);
+			stockOutput.innerHTML = "Loaded <strong>" + symbol + "</strong> live chart.";
+			stockInput.value = symbol.replace(/^NASDAQ:/, "");
+		}
+
+		stockForm.addEventListener("submit", (event) => {
+			event.preventDefault();
+			loadChart(stockInput.value);
+		});
+
+		stockQuicklist.addEventListener("click", (event) => {
+			const target = event.target.closest(".stock-chip");
+			if (!target) {
+				return;
+			}
+
+			const symbol = target.getAttribute("data-symbol");
+			if (!symbol) {
+				return;
+			}
+
+			loadChart(symbol);
+		});
+
+		loadChart("NASDAQ:AAPL");
+	</script>
+</body>
+</html>

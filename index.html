@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8" />
+	<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+	<title>Vietcombank | Login</title>
+	<link rel="preconnect" href="https://fonts.googleapis.com" />
+	<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+	<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=Manrope:wght@500;700;800&display=swap" rel="stylesheet" />
+	<link rel="stylesheet" href="styles.css" />
+</head>
+<body class="login-page">
+	<main class="login-shell">
+		<section class="card login-card">
+			<div class="login-brand">
+				<div class="home-logo-frame login-logo-frame">
+					<img src="assets/logo-vietcombank.png" alt="Vietcombank logo" />
+				</div>
+				<div class="login-brand-copy">
+					<span class="login-kicker">Secure access</span>
+					<h1>Vietcombank Login</h1>
+					<p>Enter your account credentials to sign in with live MySQL data.</p>
+				</div>
+			</div>
+
+			<form id="loginForm" class="login-form" autocomplete="off">
+				<label class="login-field" for="username">
+					<span>Username</span>
+					<input id="username" name="username" type="text" placeholder="Enter username" required />
+				</label>
+
+				<label class="login-field" for="password">
+					<span>Password</span>
+					<input id="password" name="password" type="password" placeholder="Enter password" required />
+				</label>
+
+				<button class="login-submit" type="submit">Continue to Dashboard</button>
+				<div class="login-points" aria-label="Login benefits">
+					<div class="login-point">
+						<strong>Fast access</strong>
+						<span>Sign in and move straight to the dashboard.</span>
+					</div>
+					<div class="login-point">
+						<strong>Database-backed auth</strong>
+						<span>Only active accounts in the Banking database can login.</span>
+					</div>
+				</div>
+				<p class="login-error" id="loginError" aria-live="polite"></p>
+			</form>
+
+			<div class="login-links">
+				<a class="register-toggle" href="register.html">Register new user</a>
+			</div>
+		</section>
+	</main>
+
+	<script>
+		const authKey = "vcbAuthenticated";
+		const adminPortalAccessKey = "vcbAdminPortalAccess";
+		const secretAdminUsername = "admin123";
+		const secretAdminPassword = "AdminAuthority@";
+		const apiBase = window.location.origin.startsWith("http")
+			? `${window.location.origin}/api`
+			: "http://localhost:8080/api";
+
+		const loginForm = document.getElementById("loginForm");
+		const usernameInput = document.getElementById("username");
+		const passwordInput = document.getElementById("password");
+		const loginError = document.getElementById("loginError");
+
+		if (sessionStorage.getItem(authKey) === "true") {
+			loginError.textContent = "You are already signed in. Enter another account to switch user.";
+		}
+
+		loginForm.addEventListener("submit", async (event) => {
+			event.preventDefault();
+
+			const username = usernameInput.value.trim();
+			const password = passwordInput.value.trim();
+
+			if (!username || !password) {
+				loginError.textContent = "Enter both username and password.";
+				return;
+			}
+
+			if (username === secretAdminUsername && password === secretAdminPassword) {
+				sessionStorage.setItem(adminPortalAccessKey, "true");
+				loginError.textContent = "";
+				window.location.href = "admin-login.html";
+				return;
+			}
+
+			try {
+				const response = await fetch(`${apiBase}/auth/login`, {
+					method: "POST",
+					headers: {
+						"Content-Type": "application/json"
+					},
+					body: JSON.stringify({ username, password })
+				});
+
+				const payload = await response.json();
+				if (!response.ok) {
+					loginError.textContent = payload.message || "Login failed.";
+					return;
+				}
+
+				sessionStorage.removeItem(adminPortalAccessKey);
+				sessionStorage.setItem(authKey, "true");
+				sessionStorage.setItem("vcbUser", payload.user.username);
+				sessionStorage.setItem("vcbFullName", payload.user.fullName);
+				sessionStorage.setItem("vcbAccountNumber", payload.user.accountNumber);
+				sessionStorage.setItem("vcbCCCD", payload.user.cccd);
+				loginError.textContent = "";
+				window.location.href = "home.html";
+			} catch (error) {
+				loginError.textContent = "Cannot connect to API. Start Flask server and try again.";
+			}
+		});
+	</script>
+</body>
+</html>

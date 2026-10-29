@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8" />
+	<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+	<title>Utilities | Vietcombank</title>
+	<link rel="preconnect" href="https://fonts.googleapis.com" />
+	<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+	<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=Manrope:wght@500;700;800&display=swap" rel="stylesheet" />
+	<link rel="stylesheet" href="../styles.css" />
+	<script src="../auth-watchdog.js"></script>
+	<script>
+		if (sessionStorage.getItem("vcbAuthenticated") !== "true") {
+			location.replace("../index.html");
+		}
+	</script>
+</head>
+<body class="home-page">
+	<div class="home-shell" id="top">
+		<header class="home-topbar">
+			<div class="home-brand">
+				<div class="home-logo-frame">
+					<img src="../assets/logo-vietcombank.png" alt="Vietcombank logo" />
+				</div>
+				<div class="home-brand-copy">
+					<strong>Vietcombank</strong>
+					<span>Utilities hub</span>
+				</div>
+			</div>
+			<nav class="home-nav" aria-label="Primary navigation">
+				<a href="../home.html">Home</a>
+				<a href="#utilities">Utilities</a>
+			</nav>
+		</header>
+
+		<section class="hero-panel">
+			<div class="hero-copy">
+				<span class="eyebrow reveal-block" style="--delay: 0ms;">Quick access</span>
+				<h1 class="reveal-block intro-block" style="--delay: 90ms;">All utilities in one place.</h1>
+				<p class="reveal-block intro-block" style="--delay: 180ms;">
+					Use the utilities folder as the shared entry point for weather, stock monitoring, exchange rates, and loan planning.
+				</p>
+				<div class="hero-actions reveal-block" style="--delay: 260ms;">
+					<a class="home-button primary" href="#utilities">Browse utilities</a>
+					<a class="home-button secondary" href="../home.html">Back to home</a>
+				</div>
+			</div>
+
+			<div class="hero-aside">
+				<div class="summary-card reveal-block" style="--delay: 160ms;">
+					<div class="summary-head">
+						<strong>Available tools</strong>
+						<span>4 pages</span>
+					</div>
+					<div class="mini-grid">
+						<div class="mini-tile">
+							<span>Weather</span>
+							<strong>City lookup</strong>
+						</div>
+						<div class="mini-tile">
+							<span>Stocks</span>
+							<strong>Live chart</strong>
+						</div>
+					</div>
+				</div>
+			</div>
+		</section>
+
+		<div class="section-heading" id="utilities">
+			<h2>Utilities</h2>
+		</div>
+
+		<section class="tile-grid">
+			<a class="tile tile-link tall" href="weather.html" style="--delay: 120ms;">
+				<div class="chip">Weather</div>
+				<h3>Weather</h3>
+				<p>Check local weather before trips, branch visits, or business travel.</p>
+				<div class="foot">Open weather tool</div>
+			</a>
+
+			<a class="tile tile-link tall" href="exchange.html" style="--delay: 200ms;">
+				<div class="chip">Rates</div>
+				<h3>Exchange rates</h3>
+				<p>Show live currency exchange rates for common travel and trade needs.</p>
+				<div class="foot">Open exchange utility</div>
+			</a>
+
+			<a class="tile tile-link tall" href="stock.html" style="--delay: 280ms;">
+				<div class="chip">Stocks</div>
+				<h3>Stock monitoring</h3>
+				<p>Track current quote details and monitor key symbols with the live chart.</p>
+				<div class="foot">Open stock monitor</div>
+			</a>
+
+			<a class="tile tile-link tall" href="loan-emi.html" style="--delay: 360ms;">
+				<div class="chip">Calculator</div>
+				<h3>Loan EMI calculator</h3>
+				<p>Estimate monthly EMI, total repayment, and interest for loans in seconds.</p>
+				<div class="foot">Open EMI tool</div>
+			</a>
+		</section>
+
+		<div class="footer-strip reveal-block" style="--delay: 360ms;">
+			<span>Utilities hub</span>
+			<span>Banking application</span>
+		</div>
+	</div>
+	<script>
+		const apiBase = window.location.origin.startsWith("http")
+			? `${window.location.origin}/api`
+			: "http://localhost:8080/api";
+		const cccd = sessionStorage.getItem("vcbCCCD") || "";
+
+		window.VCBSessionWatchdog.start({
+			intervalMs: 15000,
+			onInvalid: () => {
+				window.VCBSessionWatchdog.clearCustomerSession();
+				window.location.replace("../index.html");
+			},
+			validator: async () => {
+				if (!cccd) {
+					return false;
+				}
+
+				const healthResponse = await window.VCBSessionWatchdog.fetchWithTimeout(`${apiBase}/health`, {
+					cache: "no-store"
+				});
+				if (!healthResponse.ok) {
+					return false;
+				}
+
+				const accountResponse = await window.VCBSessionWatchdog.fetchWithTimeout(
+					`${apiBase}/accounts?cccd=${encodeURIComponent(cccd)}`,
+					{ cache: "no-store" }
+				);
+				if (!accountResponse.ok) {
+					return false;
+				}
+
+				const accounts = await accountResponse.json();
+				return Array.isArray(accounts) && accounts.length > 0;
+			}
+		});
+	</script>
+</body>
+</html>

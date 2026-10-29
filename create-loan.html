@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8" />
+	<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+	<title>Vietcombank | Create Loan</title>
+	<link rel="preconnect" href="https://fonts.googleapis.com" />
+	<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+	<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=Manrope:wght@500;700;800&display=swap" rel="stylesheet" />
+	<link rel="stylesheet" href="styles.css" />
+	<script src="auth-watchdog.js"></script>
+	<script>
+		if (sessionStorage.getItem("vcbAuthenticated") !== "true") {
+			location.replace("index.html");
+		}
+	</script>
+</head>
+<body class="home-page">
+	<div class="home-shell home-main-shell">
+		<header class="home-topbar">
+			<div class="home-brand">
+				<div class="home-logo-frame">
+					<img src="assets/logo-vietcombank.png" alt="Vietcombank logo" />
+				</div>
+				<div class="home-brand-copy">
+					<strong>Vietcombank</strong>
+					<span>Create loan</span>
+				</div>
+			</div>
+			<nav class="home-nav" aria-label="Secondary navigation">
+				<a href="home.html">Back to home</a>
+				<a href="create-account.html">Create payment account</a>
+				<a href="create-savings-account.html">Create savings account</a>
+				<button class="home-nav-button" id="logoutBtn" type="button">Logout</button>
+			</nav>
+		</header>
+
+		<section class="db-card" style="margin-top: 12px;">
+			<h3>Create loan</h3>
+			<form id="createLoanForm" class="action-form" autocomplete="off">
+				<label class="action-field" for="loanAmount">
+					<span>Khoan vay (VND)</span>
+					<input id="loanAmount" name="loanAmount" type="text" inputmode="numeric" placeholder="50.000.000 or 50,000,000" value="50.000.000" required />
+				</label>
+				<label class="action-field" for="termMonths">
+					<span>Thoi han vay (months)</span>
+					<input id="termMonths" name="termMonths" type="number" min="1" step="1" value="12" required />
+				</label>
+				<label class="action-field" for="principalCycle">
+					<span>Ky han goc</span>
+					<input id="principalCycle" name="principalCycle" type="number" min="1" step="1" value="1" required />
+				</label>
+				<label class="action-field" for="interestRate">
+					<span>Lai suat (0 to 0.2)</span>
+					<input id="interestRate" name="interestRate" type="number" min="0" max="0.2" step="0.001" value="0.08" required />
+				</label>
+				<label class="action-field" for="accountNumber">
+					<span>So tai khoan</span>
+					<select id="accountNumber" name="accountNumber" required></select>
+				</label>
+				<label class="action-field" for="remainingLoan">
+					<span>Khoan vay con lai (derived - uoc tinh tong phai tra)</span>
+					<input id="remainingLoan" name="remainingLoan" type="text" readonly />
+				</label>
+				<p class="helper-text">Derived estimate: loanAmount × (1 + interestRate × termMonths / 12).</p>
+				<button class="action-button" type="submit">Create loan</button>
+				<p class="action-status" id="loanActionStatus" aria-live="polite"></p>
+			</form>
+		</section>
+	</div>
+
+	<script>
+		const apiBase = window.location.origin.startsWith("http")
+			? `${window.location.origin}/api`
+			: "http://localhost:8080/api";
+
+		const cccd = sessionStorage.getItem("vcbCCCD") || "";
+		const logoutBtn = document.getElementById("logoutBtn");
+		const createLoanForm = document.getElementById("createLoanForm");
+		const loanAmount = document.getElementById("loanAmount");
+		const termMonths = document.getElementById("termMonths");
+		const principalCycle = document.getElementById("principalCycle");
+		const interestRate = document.getElementById("interestRate");
+		const accountNumber = document.getElementById("accountNumber");
+		const remainingLoan = document.getElementById("remainingLoan");
+		const loanActionStatus = document.getElementById("loanActionStatus");
+
+		const formatCurrency = (value) =>
+			new Intl.NumberFormat("vi-VN", {
+				style: "currency",
+				currency: "VND",
+				maximumFractionDigits: 0
+			}).format(Number(value || 0));
+
+		const clearCustomerSession = () => {
+			window.VCBSessionWatchdog.clearCustomerSession();
+		};
+
+		const invalidateCustomerSession = () => {
+			clearCustomerSession();
+			window.location.replace("index.html");
+		};
+
+		window.VCBSessionWatchdog.start({
+			intervalMs: 15000,
+			onInvalid: invalidateCustomerSession,
+			validator: async () => {
+				if (!cccd) {
+					return false;
+				}
+
+				const healthResponse = await window.VCBSessionWatchdog.fetchWithTimeout(`${apiBase}/health`, {
+					cache: "no-store"
+				});
+				if (!healthResponse.ok) {
+					return false;
+				}
+
+				const accountResponse = await window.VCBSessionWatchdog.fetchWithTimeout(
+					`${apiBase}/accounts?cccd=${encodeURIComponent(cccd)}`,
+					{ cache: "no-store" }
+				);
+				if (!accountResponse.ok) {
+					return false;
+				}
+
+				const accounts = await accountResponse.json();
+				return Array.isArray(accounts) && accounts.length > 0;
+			}
+		});
+
+		const setActionStatus = (message, isOk = false) => {
+			loanActionStatus.textContent = message;
+			loanActionStatus.classList.toggle("ok", isOk);
+		};
+
+		const formatVndNumber = (num) => {
+			return new Intl.NumberFormat("en-US").format(num);
+		};
+
+		const parseVndInput = (raw) => {
+			const text = String(raw || "").trim();
+			if (!text) {
+				return Number.NaN;
+			}
+
+			const normalized = text.replace(/[.,\s]/g, "");
+			if (!/^\d+$/.test(normalized)) {
+				return Number.NaN;
+			}
+
+			return Number.parseFloat(normalized);
+		};
+
+		const refreshDerivedRemainingLoan = () => {
+			const principal = parseVndInput(loanAmount.value);
+			const term = Number.parseInt(termMonths.value, 10);
+			const rate = Number.parseFloat(interestRate.value);
+
+			if (!principal || !Number.isFinite(term) || term <= 0 || !Number.isFinite(rate) || rate < 0) {
+				remainingLoan.value = "-";
+				return;
+			}
+
+			const estimated = principal * (1 + rate * (term / 12));
+			remainingLoan.value = formatCurrency(estimated);
+		};
+
+		const loadCustomerAccounts = async () => {
+			if (!cccd) {
+				setActionStatus("No CCCD found in session. Please login again.");
+				accountNumber.innerHTML = '<option value="">No account</option>';
+				accountNumber.disabled = true;
+				return;
+			}
+
+			const response = await fetch(`${apiBase}/accounts?cccd=${encodeURIComponent(cccd)}`);
+			if (!response.ok) {
+				throw new Error("Failed to load accounts.");
+			}
+
+			const accounts = await response.json();
+			if (!Array.isArray(accounts) || !accounts.length) {
+				accountNumber.innerHTML = '<option value="">No account</option>';
+				accountNumber.disabled = true;
+				setActionStatus("No account found for current customer.");
+				return;
+			}
+
+			accountNumber.innerHTML = accounts
+				.map((acc) => `<option value="${acc.So_tai_khoan}">${acc.So_tai_khoan} (${acc.Trang_thai || "Unknown"})</option>`)
+				.join("");
+			accountNumber.disabled = false;
+		};
+
+		logoutBtn.addEventListener("click", () => {
+			clearCustomerSession();
+			window.location.replace("index.html");
+		});
+
+		loanAmount.addEventListener("input", refreshDerivedRemainingLoan);
+		termMonths.addEventListener("input", refreshDerivedRemainingLoan);
+		interestRate.addEventListener("input", refreshDerivedRemainingLoan);
+
+		createLoanForm.addEventListener("submit", async (event) => {
+			event.preventDefault();
+			const parsedLoanAmount = parseVndInput(loanAmount.value);
+
+			const payload = {
+				cccd,
+				loanAmount: loanAmount.value.trim(),
+				termMonths: Number.parseInt(termMonths.value, 10),
+				principalCycle: Number.parseInt(principalCycle.value, 10),
+				interestRate: Number.parseFloat(interestRate.value),
+				accountNumber: accountNumber.value
+			};
+
+			if (!payload.cccd) {
+				setActionStatus("No CCCD found in session. Please login again.");
+				return;
+			}
+
+			if (!payload.accountNumber) {
+				setActionStatus("Khoan vay and so tai khoan are required.");
+				return;
+			}
+
+			if (!Number.isFinite(parsedLoanAmount) || parsedLoanAmount <= 0) {
+				setActionStatus("Khoan vay must be greater than 0.");
+				return;
+			}
+
+			if (!Number.isFinite(payload.termMonths) || payload.termMonths <= 0) {
+				setActionStatus("Thoi han vay must be greater than 0.");
+				return;
+			}
+
+			if (!Number.isFinite(payload.principalCycle) || payload.principalCycle <= 0) {
+				setActionStatus("Ky han goc must be greater than 0.");
+				return;
+			}
+
+			if (!Number.isFinite(payload.interestRate) || payload.interestRate < 0 || payload.interestRate > 0.2) {
+				setActionStatus("Lai suat must be between 0 and 0.2.");
+				return;
+			}
+
+			try {
+				const response = await fetch(`${apiBase}/loans/create`, {
+					method: "POST",
+					headers: {
+						"Content-Type": "application/json"
+					},
+					body: JSON.stringify(payload)
+				});
+
+				const result = await response.json();
+				if (!response.ok) {
+					setActionStatus(result.message || "Failed to create loan.");
+					return;
+				}
+
+				setActionStatus(`${result.message} Ma khoan vay: ${result.loanId}. Khoan vay con lai: ${formatCurrency(result.remainingLoan)}.`, true);
+				createLoanForm.reset();
+				loanAmount.value = "50.000.000";
+				termMonths.value = "12";
+				principalCycle.value = "1";
+				interestRate.value = "0.08";
+				refreshDerivedRemainingLoan();
+			} catch (error) {
+				setActionStatus("Cannot connect to API. Start backend server and try again.");
+			}
+		});
+
+		(async () => {
+			try {
+				await loadCustomerAccounts();
+				refreshDerivedRemainingLoan();
+			} catch (error) {
+				setActionStatus("Cannot load account list from API.");
+			}
+		})();
+	</script>
+</body>
+</html>

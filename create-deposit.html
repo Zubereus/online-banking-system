@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8" />
+	<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+	<title>Vietcombank | Admin Deposit Console</title>
+	<link rel="preconnect" href="https://fonts.googleapis.com" />
+	<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+	<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=Manrope:wght@500;700;800&display=swap" rel="stylesheet" />
+	<link rel="stylesheet" href="styles.css" />
+	<script src="auth-watchdog.js"></script>
+	<script>
+		if (sessionStorage.getItem("vcbAdminAuthenticated") !== "true") {
+			location.replace("admin-login.html");
+		}
+	</script>
+</head>
+<body class="admin-dark-page">
+	<main class="admin-shell">
+		<section class="admin-card admin-wide-card">
+			<p class="admin-kicker">Admin only</p>
+			<h1>Deposit Console</h1>
+			<p class="admin-desc">Manual deposit is restricted to administrators.</p>
+			<form id="depositForm" class="admin-form" autocomplete="off">
+				<label>
+					<span>Target account number</span>
+					<input id="depositAccountNumber" name="depositAccountNumber" type="text" placeholder="1000000001" required />
+				</label>
+				<label>
+					<span>Deposit amount (VND)</span>
+					<input id="depositAmount" name="depositAmount" type="text" inputmode="numeric" placeholder="100,000,000" required />
+				</label>
+				<button type="submit">Create deposit transaction</button>
+				<p id="depositStatus" class="admin-status" aria-live="polite"></p>
+			</form>
+			<div class="admin-link-row">
+				<a class="admin-back-link" href="admin-home.html">Back to admin home</a>
+				<button id="adminLogoutBtn" class="admin-quiet-btn" type="button">Logout</button>
+			</div>
+		</section>
+	</main>
+
+	<script>
+		const apiBase = window.location.origin.startsWith("http")
+			? `${window.location.origin}/api`
+			: "http://localhost:8080/api";
+		const adminToken = sessionStorage.getItem("vcbAdminToken") || "";
+
+		const depositForm = document.getElementById("depositForm");
+		const depositAccountNumber = document.getElementById("depositAccountNumber");
+		const depositAmount = document.getElementById("depositAmount");
+		const depositStatus = document.getElementById("depositStatus");
+		const adminLogoutBtn = document.getElementById("adminLogoutBtn");
+
+		const invalidateAdminSession = () => {
+			clearAdminSession();
+			window.location.replace("admin-login.html");
+		};
+
+		const parseVndAmount = (raw) => {
+			const digitsOnly = String(raw || "").replace(/[^\d]/g, "");
+			if (!digitsOnly) {
+				return NaN;
+			}
+			return Number(digitsOnly);
+		};
+
+		const formatVndNumber = (value) =>
+			new Intl.NumberFormat("vi-VN", { maximumFractionDigits: 0 }).format(value);
+
+		const clearAdminSession = () => {
+			window.VCBSessionWatchdog.clearAdminSession();
+		};
+
+		window.VCBSessionWatchdog.start({
+			intervalMs: 15000,
+			onInvalid: invalidateAdminSession,
+			validator: async () => {
+				if (!adminToken) {
+					return false;
+				}
+
+				const healthResponse = await window.VCBSessionWatchdog.fetchWithTimeout(`${apiBase}/health`, {
+					cache: "no-store"
+				});
+				if (!healthResponse.ok) {
+					return false;
+				}
+
+				const profileResponse = await window.VCBSessionWatchdog.fetchWithTimeout(`${apiBase}/admin/personal-info`, {
+					headers: {
+						Authorization: `Bearer ${adminToken}`
+					},
+					cache: "no-store"
+				});
+
+				return profileResponse.ok;
+			}
+		});
+
+		adminLogoutBtn.addEventListener("click", () => {
+			clearAdminSession();
+			window.location.replace("index.html");
+		});
+
+		depositForm.addEventListener("submit", async (event) => {
+			event.preventDefault();
+			depositStatus.textContent = "";
+			depositStatus.classList.remove("ok");
+
+			const accountNumber = depositAccountNumber.value.trim();
+			const amountValue = parseVndAmount(depositAmount.value);
+
+			if (!accountNumber) {
+				depositStatus.textContent = "Target account is required.";
+				depositStatus.classList.remove("ok");
+				return;
+			}
+
+			if (Number.isNaN(amountValue) || amountValue <= 0) {
+				depositStatus.textContent = "Amount must be greater than 0.";
+				depositStatus.classList.remove("ok");
+				return;
+			}
+
+			try {
+				const response = await fetch(`${apiBase}/deposits`, {
+					method: "POST",
+					headers: {
+						"Content-Type": "application/json",
+						Authorization: `Bearer ${adminToken}`
+					},
+					body: JSON.stringify({
+						accountNumber,
+						amount: amountValue
+					})
+				});
+
+				const payload = await response.json();
+				if (!response.ok) {
+					depositStatus.textContent = payload.message || "Deposit failed.";
+					depositStatus.classList.remove("ok");
+					if (response.status === 401) {
+						clearAdminSession();
+						window.location.replace("admin-login.html");
+					}
+					return;
+				}
+
+				depositStatus.textContent = `${payload.message} Transaction ID: ${payload.transactionId}`;
+				depositStatus.classList.add("ok");
+				depositAmount.value = "";
+			} catch (error) {
+				depositStatus.textContent = "Cannot connect to API. Start backend server and try again.";
+				depositStatus.classList.remove("ok");
+			}
+		});
+
+		depositAmount.addEventListener("blur", () => {
+			const amountValue = parseVndAmount(depositAmount.value);
+			if (!Number.isNaN(amountValue) && amountValue > 0) {
+				depositAmount.value = formatVndNumber(amountValue);
+			}
+		});
+	</script>
+</body>
+</html>

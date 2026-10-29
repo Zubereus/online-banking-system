@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8" />
+	<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+	<title>Vietcombank | Create Card</title>
+	<link rel="preconnect" href="https://fonts.googleapis.com" />
+	<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+	<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=Manrope:wght@500;700;800&display=swap" rel="stylesheet" />
+	<link rel="stylesheet" href="styles.css" />
+	<script src="auth-watchdog.js"></script>
+	<script>
+		if (sessionStorage.getItem("vcbAuthenticated") !== "true") {
+			location.replace("index.html");
+		}
+	</script>
+</head>
+<body class="home-page">
+	<div class="home-shell home-main-shell">
+		<header class="home-topbar">
+			<div class="home-brand">
+				<div class="home-logo-frame">
+					<img src="assets/logo-vietcombank.png" alt="Vietcombank logo" />
+				</div>
+				<div class="home-brand-copy">
+					<strong>Vietcombank</strong>
+					<span>Create credit card</span>
+				</div>
+			</div>
+			<nav class="home-nav" aria-label="Secondary navigation">
+				<a href="home.html">Back to home</a>
+				<button class="home-nav-button" id="logoutBtn" type="button">Logout</button>
+			</nav>
+		</header>
+
+		<section class="db-card" style="margin-top: 12px;">
+			<h3>Create credit card</h3>
+			<form id="createCardForm" class="action-form" autocomplete="off">
+				<label class="action-field" for="cardAccountNumber">
+					<span>Payment account</span>
+					<select id="cardAccountNumber" name="cardAccountNumber" required></select>
+				</label>
+				<label class="action-field" for="cardType">
+					<span>Card type</span>
+					<select id="cardType" name="cardType" required></select>
+				</label>
+				<button class="action-button" type="submit">Create card</button>
+				<p class="action-status" id="cardActionStatus" aria-live="polite"></p>
+			</form>
+		</section>
+	</div>
+
+	<script>
+		const apiBase = window.location.origin.startsWith("http")
+			? `${window.location.origin}/api`
+			: "http://localhost:8080/api";
+
+		const cccd = sessionStorage.getItem("vcbCCCD") || "";
+		const primaryAccount = sessionStorage.getItem("vcbAccountNumber") || "";
+		const logoutBtn = document.getElementById("logoutBtn");
+		const createCardForm = document.getElementById("createCardForm");
+		const cardAccountNumber = document.getElementById("cardAccountNumber");
+		const cardType = document.getElementById("cardType");
+		const cardActionStatus = document.getElementById("cardActionStatus");
+
+		const setActionStatus = (message, isOk = false) => {
+			cardActionStatus.textContent = message;
+			cardActionStatus.classList.toggle("ok", isOk);
+		};
+
+		const clearCustomerSession = () => {
+			window.VCBSessionWatchdog.clearCustomerSession();
+		};
+
+		const invalidateCustomerSession = () => {
+			clearCustomerSession();
+			window.location.replace("index.html");
+		};
+
+		logoutBtn.addEventListener("click", () => {
+			clearCustomerSession();
+			window.location.replace("index.html");
+		});
+
+		window.VCBSessionWatchdog.start({
+			intervalMs: 15000,
+			onInvalid: invalidateCustomerSession,
+			validator: async () => {
+				if (!cccd) {
+					return false;
+				}
+
+				const healthResponse = await window.VCBSessionWatchdog.fetchWithTimeout(`${apiBase}/health`, {
+					cache: "no-store"
+				});
+				if (!healthResponse.ok) {
+					return false;
+				}
+
+				const accountResponse = await window.VCBSessionWatchdog.fetchWithTimeout(
+					`${apiBase}/accounts?cccd=${encodeURIComponent(cccd)}`,
+					{ cache: "no-store" }
+				);
+				if (!accountResponse.ok) {
+					return false;
+				}
+
+				const accounts = await accountResponse.json();
+				return Array.isArray(accounts) && accounts.length > 0;
+			}
+		});
+
+		const loadOptions = async () => {
+			if (!cccd) {
+				setActionStatus("No CCCD found in session. Please login again.");
+				return;
+			}
+
+			try {
+				const accountResponse = await fetch(`${apiBase}/accounts?cccd=${encodeURIComponent(cccd)}`);
+				if (!accountResponse.ok) {
+					throw new Error("Failed to load accounts");
+				}
+
+				const accounts = await accountResponse.json();
+				if (!Array.isArray(accounts) || !accounts.length) {
+					invalidateCustomerSession();
+					return;
+				}
+				const activeAccounts = accounts.filter((account) => account.Trang_thai === "Hoat_dong");
+				cardAccountNumber.innerHTML = activeAccounts
+					.map((account) => `<option value="${account.So_tai_khoan}">${account.So_tai_khoan}</option>`)
+					.join("");
+
+				if (!activeAccounts.length) {
+					cardAccountNumber.innerHTML = '<option value="">Not an active account</option>';
+					setActionStatus("No active account found.");
+					return;
+				}
+
+				if (primaryAccount && activeAccounts.some((account) => account.So_tai_khoan === primaryAccount)) {
+					cardAccountNumber.value = primaryAccount;
+				}
+
+				const cardTypeResponse = await fetch(`${apiBase}/card-types`);
+				if (!cardTypeResponse.ok) {
+					throw new Error("Failed to load card types");
+				}
+
+				const types = await cardTypeResponse.json();
+				const uniqueTypes = [...new Set(types)];
+				cardType.innerHTML = uniqueTypes.length
+					? uniqueTypes.map((name) => `<option value="${name}">${name}</option>`).join("")
+					: '<option value="">No card type</option>';
+			} catch (error) {
+				setActionStatus("Cannot connect to API. Start backend server and try again.");
+			}
+		};
+
+		createCardForm.addEventListener("submit", async (event) => {
+			event.preventDefault();
+
+			if (!cardAccountNumber.value || !cardType.value) {
+				setActionStatus("Choose account and card type.");
+				return;
+			}
+
+			try {
+				const response = await fetch(`${apiBase}/cards`, {
+					method: "POST",
+					headers: {
+						"Content-Type": "application/json"
+					},
+					body: JSON.stringify({
+						cccd,
+						accountNumber: cardAccountNumber.value,
+						cardType: cardType.value
+					})
+				});
+
+				const payload = await response.json();
+				if (!response.ok) {
+					setActionStatus(payload.message || "Failed to create card.");
+					return;
+				}
+
+				setActionStatus(`${payload.message} Card number: ${payload.cardNumber}`, true);
+			} catch (error) {
+				setActionStatus("Cannot connect to API. Start backend server and try again.");
+			}
+		});
+
+		loadOptions();
+	</script>
+</body>
+</html>

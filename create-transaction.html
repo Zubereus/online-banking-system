@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8" />
+	<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+	<title>Vietcombank | Create Transaction</title>
+	<link rel="preconnect" href="https://fonts.googleapis.com" />
+	<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+	<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=Manrope:wght@500;700;800&display=swap" rel="stylesheet" />
+	<link rel="stylesheet" href="styles.css" />
+	<script src="auth-watchdog.js"></script>
+	<script>
+		if (sessionStorage.getItem("vcbAuthenticated") !== "true") {
+			location.replace("index.html");
+		}
+	</script>
+</head>
+<body class="home-page">
+	<div class="home-shell home-main-shell">
+		<header class="home-topbar">
+			<div class="home-brand">
+				<div class="home-logo-frame">
+					<img src="assets/logo-vietcombank.png" alt="Vietcombank logo" />
+				</div>
+				<div class="home-brand-copy">
+					<strong>Vietcombank</strong>
+					<span>Create transaction</span>
+				</div>
+			</div>
+			<nav class="home-nav" aria-label="Secondary navigation">
+				<a href="home.html">Back to home</a>
+				<button class="home-nav-button" id="logoutBtn" type="button">Logout</button>
+			</nav>
+		</header>
+
+		<section class="db-card" style="margin-top: 12px;">
+			<h3>Create transaction</h3>
+			<form id="createTransactionForm" class="action-form" autocomplete="off">
+				<label class="action-field" for="senderAccount">
+					<span>Sender account</span>
+					<select id="senderAccount" name="senderAccount" required></select>
+				</label>
+				<label class="action-field" for="receiverAccount">
+					<span>Receiver account number</span>
+					<input id="receiverAccount" name="receiverAccount" type="text" placeholder="1000000008" required />
+					<small id="receiverNameHint" class="recipient-hint" aria-live="polite"></small>
+				</label>
+				<label class="action-field" for="bankName">
+					<span>Bank / Account info</span>
+					<input id="bankName" name="bankName" type="text" placeholder="Will auto-fill when you enter account " readonly aria-readonly="true" />
+				</label>
+				<label class="action-field" for="transactionAmount">
+					<span>Amount (VND)</span>
+					<input id="transactionAmount" name="transactionAmount" type="text" inputmode="numeric" placeholder="100,000,000" required />
+				</label>
+				<label class="action-field" for="transactionFee">
+					<span>Fee (VND)</span>
+					<input id="transactionFee" name="transactionFee" type="text" inputmode="numeric" value="0" placeholder="Auto-calculated" readonly aria-readonly="true" />
+				</label>
+				<label class="action-field" for="receiveMethod">
+					<span>Receive method</span>
+					<select id="receiveMethod" name="receiveMethod" required>
+						<option value="Online">Online</option>
+						<option value="Offline">Offline</option>
+					</select>
+				</label>
+				<label class="action-field" for="promotionCode">
+					<span>Promotion (optional)</span>
+					<select id="promotionCode" name="promotionCode">
+						<option value="">No promotion</option>
+					</select>
+				</label>
+				<button class="action-button" type="submit">Create transaction</button>
+				<p class="action-status" id="transactionActionStatus" aria-live="polite"></p>
+			</form>
+		</section>
+	</div>
+
+	<script>
+		const apiBase = window.location.origin.startsWith("http")
+			? `${window.location.origin}/api`
+			: "http://localhost:8080/api";
+
+		const cccd = sessionStorage.getItem("vcbCCCD") || "";
+		const primaryAccount = sessionStorage.getItem("vcbAccountNumber") || "";
+		const logoutBtn = document.getElementById("logoutBtn");
+		const createTransactionForm = document.getElementById("createTransactionForm");
+		const senderAccount = document.getElementById("senderAccount");
+		const receiverAccount = document.getElementById("receiverAccount");
+		const transactionAmount = document.getElementById("transactionAmount");
+		const transactionFee = document.getElementById("transactionFee");
+		const receiveMethod = document.getElementById("receiveMethod");
+		const promotionCode = document.getElementById("promotionCode");
+		const transactionActionStatus = document.getElementById("transactionActionStatus");
+		const receiverNameHint = document.getElementById("receiverNameHint");
+		const bankName = document.getElementById("bankName");
+		let receiverLookupTimer = null;
+
+		const clearCustomerSession = () => {
+			window.VCBSessionWatchdog.clearCustomerSession();
+		};
+
+		const invalidateCustomerSession = () => {
+			clearCustomerSession();
+			window.location.replace("index.html");
+		};
+
+		const parseVndAmount = (raw) => {
+			const digitsOnly = String(raw || "").replace(/[^\d]/g, "");
+			if (!digitsOnly) {
+				return NaN;
+			}
+			return Number(digitsOnly);
+		};
+
+		const formatVndNumber = (value) =>
+			new Intl.NumberFormat("vi-VN", { maximumFractionDigits: 0 }).format(value);
+
+		const calculateTransactionFee = (amount) => {
+			const rawFee = Math.round(Number(amount || 0) * 0.0005 / 1000) * 1000;
+			return Math.max(500, rawFee);
+		};
+
+		const syncTransactionFee = () => {
+			const amountValue = parseVndAmount(transactionAmount.value);
+			if (Number.isNaN(amountValue) || amountValue <= 0) {
+				transactionFee.value = "0";
+				return 0;
+			}
+
+			const feeValue = calculateTransactionFee(amountValue);
+			transactionFee.value = formatVndNumber(feeValue);
+			return feeValue;
+		};
+
+		const setActionStatus = (message, isOk = false) => {
+			transactionActionStatus.textContent = message;
+			transactionActionStatus.classList.toggle("ok", isOk);
+		};
+
+		const setReceiverHint = (message, isError = false) => {
+			receiverNameHint.textContent = message;
+			receiverNameHint.classList.toggle("error", isError);
+		};
+
+		const lookupReceiverName = async (query) => {
+			if (!query || query.length < 6) {
+				setReceiverHint("");
+				bankName.value = "";
+				return;
+			}
+
+			try {
+				const response = await fetch(`${apiBase}/recipient-lookup?query=${encodeURIComponent(query)}`);
+				if (!response.ok) {
+					setReceiverHint("");
+					bankName.value = "";
+					return;
+				}
+
+				const payload = await response.json();
+				if (!payload.found) {
+					setReceiverHint("No account name found.", true);
+					bankName.value = "";
+					return;
+				}
+
+				setReceiverHint(payload.name || "Unknown recipient", false);
+				bankName.value = payload.bank || payload.name || "";
+			} catch (error) {
+				setReceiverHint("");
+				bankName.value = "";
+			}
+		};
+
+		logoutBtn.addEventListener("click", () => {
+			clearCustomerSession();
+			window.location.replace("index.html");
+		});
+
+		window.VCBSessionWatchdog.start({
+			intervalMs: 15000,
+			onInvalid: invalidateCustomerSession,
+			validator: async () => {
+				if (!cccd) {
+					return false;
+				}
+
+				const healthResponse = await window.VCBSessionWatchdog.fetchWithTimeout(`${apiBase}/health`, {
+					cache: "no-store"
+				});
+				if (!healthResponse.ok) {
+					return false;
+				}
+
+				const accountResponse = await window.VCBSessionWatchdog.fetchWithTimeout(
+					`${apiBase}/accounts?cccd=${encodeURIComponent(cccd)}`,
+					{ cache: "no-store" }
+				);
+				if (!accountResponse.ok) {
+					return false;
+				}
+
+				const accounts = await accountResponse.json();
+				return Array.isArray(accounts) && accounts.length > 0;
+			}
+		});
+
+		const loadAccounts = async () => {
+			if (!cccd) {
+				setActionStatus("No CCCD found in session. Please login again.");
+				return;
+			}
+
+			try {
+				const accountResponse = await fetch(`${apiBase}/accounts?cccd=${encodeURIComponent(cccd)}`);
+				if (!accountResponse.ok) {
+					throw new Error("Failed to load accounts");
+				}
+
+				const accounts = await accountResponse.json();
+				if (!Array.isArray(accounts) || !accounts.length) {
+					invalidateCustomerSession();
+					return;
+				}
+				const activeAccounts = accounts.filter((account) => account.Trang_thai === "Hoat_dong");
+				senderAccount.innerHTML = activeAccounts
+					.map((account) => `<option value="${account.So_tai_khoan}">${account.So_tai_khoan}</option>`)
+					.join("");
+
+				if (!activeAccounts.length) {
+					senderAccount.innerHTML = '<option value="">Not an active account</option>';
+					setActionStatus("No active account found.");
+					return;
+				}
+
+				if (primaryAccount && activeAccounts.some((account) => account.So_tai_khoan === primaryAccount)) {
+					senderAccount.value = primaryAccount;
+				}
+
+				await loadPromotions();
+			} catch (error) {
+				setActionStatus("Cannot connect to API. Start backend server and try again.");
+			}
+		};
+
+		const loadPromotions = async () => {
+			const selectedAccount = senderAccount.value.trim();
+			if (!selectedAccount) {
+				promotionCode.innerHTML = '<option value="">No promotion available</option>';
+				return;
+			}
+
+			try {
+				const response = await fetch(`${apiBase}/promotions?accountNumber=${encodeURIComponent(selectedAccount)}&feature=transaction`);
+				if (!response.ok) {
+					throw new Error("Failed to load promotions");
+				}
+
+				const promotions = await response.json();
+				if (!Array.isArray(promotions) || !promotions.length) {
+					promotionCode.innerHTML = '<option value="">No promotion available</option>';
+					return;
+				}
+
+				promotionCode.innerHTML = [
+					'<option value="">No promotion</option>',
+					...promotions.map((item) => {
+						const minAmount = formatVndNumber(Number(item.So_tien_toi_thieu || 0));
+						const valueAmount = formatVndNumber(Number(item.So_tien_khuyen_mai || 0));
+						const remaining = Number(item.So_luong || 0);
+						const title = item.Ten_chuong_trinh || item.Ma;
+						return `<option value="${item.Ma}">${item.Ma} - ${title} (min ${minAmount} VND, value ${valueAmount} VND, left ${remaining})</option>`;
+					})
+				].join("");
+			} catch (error) {
+				promotionCode.innerHTML = '<option value="">No promotion available</option>';
+			}
+		};
+
+		createTransactionForm.addEventListener("submit", async (event) => {
+			event.preventDefault();
+
+			const amountValue = parseVndAmount(transactionAmount.value);
+			const feeValue = syncTransactionFee();
+
+			if (!senderAccount.value || !receiverAccount.value.trim()) {
+				setActionStatus("Choose sender and enter receiver account.");
+				return;
+			}
+
+			if (amountValue <= 0 || Number.isNaN(amountValue)) {
+				setActionStatus("Amount must be greater than 0.");
+				return;
+			}
+
+			if (feeValue < 0 || Number.isNaN(feeValue)) {
+				setActionStatus("Fee cannot be negative.");
+				return;
+			}
+
+			try {
+				const response = await fetch(`${apiBase}/transactions`, {
+					method: "POST",
+					headers: {
+						"Content-Type": "application/json"
+					},
+					body: JSON.stringify({
+						cccd,
+						senderAccount: senderAccount.value,
+						receiverAccount: receiverAccount.value.trim(),
+						amount: amountValue,
+						fee: feeValue,
+						receiveMethod: receiveMethod.value,
+						promotionCode: promotionCode.value
+					})
+				});
+
+				const payload = await response.json();
+				if (!response.ok) {
+					setActionStatus(payload.message || "Failed to create transaction.");
+					return;
+				}
+
+				setActionStatus(`${payload.message} Transaction ID: ${payload.transactionId}`, true);
+				receiverAccount.value = "";
+				setReceiverHint("");
+				transactionAmount.value = "";
+				transactionFee.value = "0";
+				promotionCode.value = "";
+			} catch (error) {
+				setActionStatus("Cannot connect to API. Start backend server and try again.");
+			}
+		});
+
+		receiverAccount.addEventListener("input", () => {
+			const query = receiverAccount.value.trim();
+			if (receiverLookupTimer) {
+				window.clearTimeout(receiverLookupTimer);
+			}
+			receiverLookupTimer = window.setTimeout(() => {
+				lookupReceiverName(query);
+			}, 220);
+		});
+
+		transactionAmount.addEventListener("blur", () => {
+			const amountValue = parseVndAmount(transactionAmount.value);
+			if (!Number.isNaN(amountValue) && amountValue > 0) {
+				transactionAmount.value = formatVndNumber(amountValue);
+				syncTransactionFee();
+			}
+		});
+
+		transactionAmount.addEventListener("input", syncTransactionFee);
+		senderAccount.addEventListener("change", loadPromotions);
+		syncTransactionFee();
+
+		loadAccounts();
+	</script>
+</body>
+</html>

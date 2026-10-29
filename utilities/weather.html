@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8" />
+	<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+	<title>Weather Lookup</title>
+	<link rel="preconnect" href="https://fonts.googleapis.com" />
+	<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+	<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=Manrope:wght@500;700;800&display=swap" rel="stylesheet" />
+	<link rel="stylesheet" href="../styles.css" />
+	<script src="../auth-watchdog.js"></script>
+	<script>
+		if (sessionStorage.getItem("vcbAuthenticated") !== "true") {
+			location.replace("../index.html");
+		}
+	</script>
+</head>
+<body>
+	<div class="orb one"></div>
+	<div class="orb two"></div>
+
+	<main class="card">
+		<header class="topbar" id="topbar">
+			<div class="brand">Demo Playground</div>
+			<button class="menu-toggle" id="menuToggle" aria-label="Toggle menu" aria-expanded="false" aria-controls="dropdownMenu">
+				<span class="menu-icon" aria-hidden="true">
+					<span></span>
+					<span></span>
+					<span></span>
+				</span>
+			</button>
+			<nav class="dropdown" id="dropdownMenu" aria-label="Main menu">
+				<a href="../home.html">Home</a>
+				<a href="index.html">Utilities</a>
+				<a href="weather.html">Weather Utility</a>
+				<a href="exchange.html">Exchange Utility</a>
+				<a href="stock.html">Stock Monitor</a>
+				<a href="loan-emi.html">Loan EMI</a>
+			</nav>
+		</header>
+
+		<section class="hero">
+			<span class="badge">New Feature Page</span>
+			<h1>Live Weather Lookup</h1>
+			<p>Search any city and fetch current weather data from a public API.</p>
+		</section>
+
+		<section class="grid">
+			<article class="panel big">
+				<h2>Check Weather by City</h2>
+				<p class="muted">Example: Hanoi, Da Nang, Tokyo, London</p>
+				<form id="weatherForm" class="weather-form">
+					<input id="cityInput" class="weather-input" type="text" name="city" placeholder="Enter city name" required />
+					<button class="primary" type="submit">Get Weather</button>
+				</form>
+				<div class="weather-output" id="weatherOutput">Type a city and press Get Weather.</div>
+			</article>
+
+			<article class="panel small">
+				<h2>How It Works</h2>
+				<ol class="list">
+					<li>Find city coordinates using Open-Meteo Geocoding API.</li>
+					<li>Fetch current weather from Open-Meteo Forecast API.</li>
+					<li>Render temperature, wind speed, and timestamp.</li>
+				</ol>
+			</article>
+		</section>
+	</main>
+
+	<script>
+		const topbar = document.getElementById("topbar");
+		const menuToggle = document.getElementById("menuToggle");
+		const weatherForm = document.getElementById("weatherForm");
+		const cityInput = document.getElementById("cityInput");
+		const weatherOutput = document.getElementById("weatherOutput");
+		const apiBase = window.location.origin.startsWith("http")
+			? `${window.location.origin}/api`
+			: "http://localhost:8080/api";
+		const cccd = sessionStorage.getItem("vcbCCCD") || "";
+
+		window.VCBSessionWatchdog.start({
+			intervalMs: 15000,
+			onInvalid: () => {
+				window.VCBSessionWatchdog.clearCustomerSession();
+				window.location.replace("../index.html");
+			},
+			validator: async () => {
+				if (!cccd) {
+					return false;
+				}
+
+				const healthResponse = await window.VCBSessionWatchdog.fetchWithTimeout(`${apiBase}/health`, {
+					cache: "no-store"
+				});
+				if (!healthResponse.ok) {
+					return false;
+				}
+
+				const accountResponse = await window.VCBSessionWatchdog.fetchWithTimeout(
+					`${apiBase}/accounts?cccd=${encodeURIComponent(cccd)}`,
+					{ cache: "no-store" }
+				);
+				if (!accountResponse.ok) {
+					return false;
+				}
+
+				const accounts = await accountResponse.json();
+				return Array.isArray(accounts) && accounts.length > 0;
+			}
+		});
+
+		menuToggle.addEventListener("click", () => {
+			const isOpen = topbar.classList.toggle("menu-open");
+			menuToggle.setAttribute("aria-expanded", String(isOpen));
+		});
+
+		document.addEventListener("click", (event) => {
+			if (!topbar.contains(event.target)) {
+				topbar.classList.remove("menu-open");
+				menuToggle.setAttribute("aria-expanded", "false");
+			}
+		});
+
+		function mapWeatherCode(code) {
+			const map = {
+				0: "Clear sky",
+				1: "Mainly clear",
+				2: "Partly cloudy",
+				3: "Overcast",
+				45: "Fog",
+				48: "Depositing rime fog",
+				51: "Light drizzle",
+				53: "Moderate drizzle",
+				55: "Dense drizzle",
+				61: "Slight rain",
+				63: "Moderate rain",
+				65: "Heavy rain",
+				71: "Slight snow",
+				73: "Moderate snow",
+				75: "Heavy snow",
+				80: "Rain showers",
+				95: "Thunderstorm"
+			};
+			return map[code] || "Unknown condition";
+		}
+
+		async function fetchWeather(city) {
+			const geoUrl = "https://geocoding-api.open-meteo.com/v1/search?name=" + encodeURIComponent(city) + "&count=1";
+			const geoRes = await fetch(geoUrl);
+			if (!geoRes.ok) {
+				throw new Error("Unable to search city right now.");
+			}
+
+			const geoData = await geoRes.json();
+			if (!geoData.results || geoData.results.length === 0) {
+				throw new Error("City not found. Try another name.");
+			}
+
+			const place = geoData.results[0];
+			const weatherUrl =
+				"https://api.open-meteo.com/v1/forecast?latitude=" +
+				place.latitude +
+				"&longitude=" +
+				place.longitude +
+				"&current=temperature_2m,wind_speed_10m,weather_code&timezone=auto";
+
+			const weatherRes = await fetch(weatherUrl);
+			if (!weatherRes.ok) {
+				throw new Error("Unable to fetch weather data.");
+			}
+
+			const weatherData = await weatherRes.json();
+			const current = weatherData.current;
+			if (!current) {
+				throw new Error("Weather data is unavailable for this location.");
+			}
+
+			const cityLabel = place.name + (place.country ? ", " + place.country : "");
+			weatherOutput.innerHTML =
+				"<strong>" + cityLabel + "</strong><br>" +
+				"Condition: " + mapWeatherCode(current.weather_code) + "<br>" +
+				"Temperature: " + current.temperature_2m + "°C<br>" +
+				"Wind Speed: " + current.wind_speed_10m + " km/h<br>" +
+				"Updated: " + current.time;
+		}
+
+		weatherForm.addEventListener("submit", async (event) => {
+			event.preventDefault();
+			const city = cityInput.value.trim();
+			if (!city) {
+				weatherOutput.textContent = "Please enter a city name.";
+				return;
+			}
+
+			weatherOutput.textContent = "Loading weather...";
+			try {
+				await fetchWeather(city);
+			} catch (error) {
+				weatherOutput.textContent = error.message;
+			}
+		});
+	</script>
+</body>
+</html>

@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8" />
+	<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+	<title>Loan EMI Calculator</title>
+	<link rel="preconnect" href="https://fonts.googleapis.com" />
+	<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+	<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=Manrope:wght@500;700;800&display=swap" rel="stylesheet" />
+	<link rel="stylesheet" href="../styles.css" />
+	<script src="../auth-watchdog.js"></script>
+	<script>
+		if (sessionStorage.getItem("vcbAuthenticated") !== "true") {
+			location.replace("../index.html");
+		}
+	</script>
+</head>
+<body>
+	<div class="orb one"></div>
+	<div class="orb two"></div>
+
+	<main class="card">
+		<header class="topbar" id="topbar">
+			<div class="brand">Utility: Loan EMI Calculator</div>
+			<button class="menu-toggle" id="menuToggle" aria-label="Toggle menu" aria-expanded="false" aria-controls="dropdownMenu">
+				<span class="menu-icon" aria-hidden="true">
+					<span></span>
+					<span></span>
+					<span></span>
+				</span>
+			</button>
+			<nav class="dropdown" id="dropdownMenu" aria-label="Main menu">
+				<a href="../home.html">Home</a>
+				<a href="index.html">Utilities</a>
+				<a href="weather.html">Weather Utility</a>
+				<a href="exchange.html">Exchange Utility</a>
+				<a href="stock.html">Stock Monitor</a>
+				<a href="loan-emi.html">Loan EMI</a>
+			</nav>
+		</header>
+
+		<section class="hero">
+			<span class="badge">Planning Utility</span>
+			<h1>Loan EMI Calculator</h1>
+			<p>Estimate monthly EMI, total repayment, and total interest for loans and installment plans.</p>
+		</section>
+
+		<section class="grid loan-grid">
+			<article class="panel big">
+				<h2>EMI Calculator</h2>
+				<p class="muted">Enter amount, interest rate, term, and optional down payment.</p>
+				<form id="loanForm" class="loan-form">
+					<input id="principalInput" class="loan-input" type="text" inputmode="numeric" placeholder="Amount (VND)" required />
+					<input id="rateInput" class="loan-input" type="number" min="0" step="0.01" placeholder="Rate %" required />
+					<input id="yearsInput" class="loan-input" type="number" min="1" step="1" placeholder="Years" required />
+					<input id="downInput" class="loan-input" type="text" inputmode="numeric" placeholder="Down payment (optional) (VND)" />
+					<div class="loan-actions">
+						<button class="primary" type="submit">Calculate EMI</button>
+						<button id="resetLoanBtn" class="secondary" type="button">Reset</button>
+					</div>
+				</form>
+				<div class="loan-output" id="loanOutput">Fill in values and press Calculate EMI.</div>
+			</article>
+
+			<article class="panel small">
+				<h2>First 12 Months</h2>
+				<p class="muted">Quick amortization snapshot:</p>
+				<div class="loan-table-wrap">
+					<table class="loan-table" id="loanTable">
+						<thead>
+							<tr>
+								<th>Month</th>
+								<th>Principal</th>
+								<th>Interest</th>
+							</tr>
+						</thead>
+						<tbody id="loanTableBody"></tbody>
+					</table>
+				</div>
+			</article>
+		</section>
+	</main>
+
+	<script>
+		const topbar = document.getElementById("topbar");
+		const menuToggle = document.getElementById("menuToggle");
+		const loanForm = document.getElementById("loanForm");
+		const principalInput = document.getElementById("principalInput");
+		const rateInput = document.getElementById("rateInput");
+		const yearsInput = document.getElementById("yearsInput");
+		const downInput = document.getElementById("downInput");
+		const resetLoanBtn = document.getElementById("resetLoanBtn");
+		const loanOutput = document.getElementById("loanOutput");
+		const loanTableBody = document.getElementById("loanTableBody");
+		const apiBase = window.location.origin.startsWith("http")
+			? `${window.location.origin}/api`
+			: "http://localhost:8080/api";
+		const cccd = sessionStorage.getItem("vcbCCCD") || "";
+
+		window.VCBSessionWatchdog.start({
+			intervalMs: 15000,
+			onInvalid: () => {
+				window.VCBSessionWatchdog.clearCustomerSession();
+				window.location.replace("../index.html");
+			},
+			validator: async () => {
+				if (!cccd) {
+					return false;
+				}
+
+				const healthResponse = await window.VCBSessionWatchdog.fetchWithTimeout(`${apiBase}/health`, {
+					cache: "no-store"
+				});
+				if (!healthResponse.ok) {
+					return false;
+				}
+
+				const accountResponse = await window.VCBSessionWatchdog.fetchWithTimeout(
+					`${apiBase}/accounts?cccd=${encodeURIComponent(cccd)}`,
+					{ cache: "no-store" }
+				);
+				if (!accountResponse.ok) {
+					return false;
+				}
+
+				const accounts = await accountResponse.json();
+				return Array.isArray(accounts) && accounts.length > 0;
+			}
+		});
+
+		menuToggle.addEventListener("click", () => {
+			const isOpen = topbar.classList.toggle("menu-open");
+			menuToggle.setAttribute("aria-expanded", String(isOpen));
+		});
+
+		document.addEventListener("click", (event) => {
+			if (!topbar.contains(event.target)) {
+				topbar.classList.remove("menu-open");
+				menuToggle.setAttribute("aria-expanded", "false");
+			}
+		});
+
+		function formatMoney(value) {
+			return value.toLocaleString(undefined, { maximumFractionDigits: 0 });
+		}
+
+		function parseVndValue(value) {
+			const cleaned = String(value || "").replace(/[,\s]/g, "").trim();
+			if (!cleaned) {
+				return NaN;
+			}
+
+			return Number(cleaned);
+		}
+
+		function calculateEmi(principal, annualRate, months) {
+			if (months <= 0) {
+				return 0;
+			}
+
+			const monthlyRate = annualRate / 12 / 100;
+			if (monthlyRate === 0) {
+				return principal / months;
+			}
+
+			const factor = Math.pow(1 + monthlyRate, months);
+			return (principal * monthlyRate * factor) / (factor - 1);
+		}
+
+		function renderSchedule(principal, annualRate, emi, months) {
+			loanTableBody.innerHTML = "";
+			let balance = principal;
+			const monthlyRate = annualRate / 12 / 100;
+
+			for (let month = 1; month <= Math.min(12, months); month += 1) {
+				const interestPart = monthlyRate === 0 ? 0 : balance * monthlyRate;
+				const principalPart = Math.min(emi - interestPart, balance);
+				balance = Math.max(balance - principalPart, 0);
+
+				const row = document.createElement("tr");
+				row.innerHTML =
+					"<td>" + month + "</td>" +
+					"<td>" + formatMoney(principalPart) + "</td>" +
+					"<td>" + formatMoney(interestPart) + "</td>";
+				loanTableBody.appendChild(row);
+			}
+		}
+
+		loanForm.addEventListener("submit", (event) => {
+			event.preventDefault();
+
+			const principal = parseVndValue(principalInput.value);
+			const annualRate = Number(rateInput.value);
+			const years = Number(yearsInput.value);
+			const downPayment = downInput.value ? parseVndValue(downInput.value) : 0;
+
+			if (!principal || principal <= 0) {
+				loanOutput.textContent = "Loan amount in VND must be greater than 0.";
+				return;
+			}
+			if (Number.isNaN(principal)) {
+				loanOutput.textContent = "Enter the loan amount as numbers only, for example 500000000 or 500,000,000.";
+				return;
+			}
+			if (annualRate < 0) {
+				loanOutput.textContent = "Interest rate cannot be negative.";
+				return;
+			}
+			if (!years || years <= 0) {
+				loanOutput.textContent = "Loan term must be greater than 0 years.";
+				return;
+			}
+			if (Number.isNaN(downPayment)) {
+				loanOutput.textContent = "Down payment must be a number if you enter one.";
+				return;
+			}
+			if (downPayment < 0 || downPayment >= principal) {
+				loanOutput.textContent = "Down payment must be between 0 and less than the loan amount.";
+				return;
+			}
+
+			const financedAmount = principal - downPayment;
+			const months = Math.round(years * 12);
+			const emi = calculateEmi(financedAmount, annualRate, months);
+			const totalPayment = emi * months;
+			const totalInterest = totalPayment - financedAmount;
+
+			loanOutput.innerHTML =
+				"<strong>Estimated EMI: " + formatMoney(emi) + " VND / month</strong><br>" +
+				"Financed amount: " + formatMoney(financedAmount) + " VND<br>" +
+				"Total repayment: " + formatMoney(totalPayment) + " VND<br>" +
+				"Total interest: " + formatMoney(totalInterest) + " VND";
+
+			renderSchedule(financedAmount, annualRate, emi, months);
+		});
+
+		resetLoanBtn.addEventListener("click", () => {
+			principalInput.value = "";
+			rateInput.value = "";
+			yearsInput.value = "";
+			downInput.value = "";
+			loanOutput.textContent = "Fill in values and press Calculate EMI.";
+			loanTableBody.innerHTML = "";
+		});
+	</script>
+</body>
+</html>

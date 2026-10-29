@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8" />
+	<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+	<title>Vietcombank | Admin Login</title>
+	<link rel="preconnect" href="https://fonts.googleapis.com" />
+	<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+	<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=Manrope:wght@500;700;800&display=swap" rel="stylesheet" />
+	<link rel="stylesheet" href="styles.css" />
+	<script>
+		if (sessionStorage.getItem("vcbAdminPortalAccess") !== "true") {
+			location.replace("index.html");
+		}
+	</script>
+</head>
+<body class="admin-dark-page">
+	<main class="admin-shell">
+		<section class="admin-card">
+			<p class="admin-kicker">Admin Console</p>
+			<h1>Admin Login</h1>
+			<p class="admin-desc">Sign in with an account provisioned in SQL/admin_dataset.sql.</p>
+			<form id="adminLoginForm" class="admin-form" autocomplete="off">
+				<label>
+					<span>Admin username</span>
+					<input id="adminUsername" type="text" required />
+				</label>
+				<label>
+					<span>Admin password</span>
+					<input id="adminPassword" type="password" required />
+				</label>
+				<button type="submit">Sign in to admin home</button>
+				<p id="adminLoginStatus" class="admin-status" aria-live="polite"></p>
+			</form>
+			<a class="admin-back-link" href="index.html">Back to customer login</a>
+		</section>
+	</main>
+
+	<script>
+		const apiBase = window.location.origin.startsWith("http")
+			? `${window.location.origin}/api`
+			: "http://localhost:8080/api";
+
+		const adminLoginForm = document.getElementById("adminLoginForm");
+		const adminUsername = document.getElementById("adminUsername");
+		const adminPassword = document.getElementById("adminPassword");
+		const adminLoginStatus = document.getElementById("adminLoginStatus");
+
+		adminLoginForm.addEventListener("submit", async (event) => {
+			event.preventDefault();
+			adminLoginStatus.textContent = "";
+
+			try {
+				const response = await fetch(`${apiBase}/admin/login`, {
+					method: "POST",
+					headers: { "Content-Type": "application/json" },
+					body: JSON.stringify({
+						username: adminUsername.value.trim(),
+						password: adminPassword.value.trim()
+					})
+				});
+				const payload = await response.json();
+
+				if (!response.ok) {
+					adminLoginStatus.textContent = payload.message || "Admin login failed.";
+					return;
+				}
+
+				sessionStorage.setItem("vcbAdminAuthenticated", "true");
+				sessionStorage.setItem("vcbAdminToken", payload.token);
+				sessionStorage.setItem("vcbAdminName", payload.admin.fullName);
+				sessionStorage.setItem("vcbAdminUser", payload.admin.username);
+				sessionStorage.setItem("vcbAdminCode", payload.admin.maSo);
+				sessionStorage.setItem("vcbAdminCccd", payload.admin.cccd || "");
+				sessionStorage.setItem("vcbAdminGender", payload.admin.gender || "");
+				sessionStorage.setItem("vcbAdminNationality", payload.admin.nationality || "");
+				sessionStorage.setItem("vcbAdminPhones", payload.admin.phones || "");
+				sessionStorage.setItem("vcbAdminEmails", payload.admin.emails || "");
+				window.location.href = "admin-home.html";
+			} catch (error) {
+				adminLoginStatus.textContent = "Cannot connect to API. Start backend server and try again.";
+			}
+		});
+	</script>
+</body>
+</html>

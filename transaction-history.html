@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8" />
+	<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+	<title>Vietcombank | Transaction History</title>
+	<link rel="preconnect" href="https://fonts.googleapis.com" />
+	<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+	<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=Manrope:wght@500;700;800&display=swap" rel="stylesheet" />
+	<link rel="stylesheet" href="styles.css" />
+	<script src="auth-watchdog.js"></script>
+	<script>
+		if (sessionStorage.getItem("vcbAuthenticated") !== "true") {
+			location.replace("index.html");
+		}
+	</script>
+</head>
+<body class="home-page">
+	<div class="home-shell home-main-shell" id="top">
+		<header class="home-topbar">
+			<div class="home-brand">
+				<div class="home-logo-frame">
+					<img src="assets/logo-vietcombank.png" alt="Vietcombank logo" />
+				</div>
+				<div class="home-brand-copy">
+					<strong>Vietcombank</strong>
+					<span>Personal banking made simple</span>
+				</div>
+			</div>
+			<nav class="home-nav" aria-label="Primary navigation">
+				<a href="home.html">Back to home</a>
+				<button class="home-nav-button" id="logoutBtn" type="button">Logout</button>
+			</nav>
+		</header>
+
+		<section class="hero-panel">
+			<div class="hero-copy">
+				<h1 class="reveal-block intro-block" style="--delay: 90ms;">Transaction History</h1>
+				<p class="reveal-block intro-block" style="--delay: 180ms;">View detailed transaction records for your accounts</p>
+			</div>
+		</section>
+
+		<section class="db-grid">
+			<article class="db-card reveal-block" style="--delay: 120ms;">
+				<div class="db-card-head">
+					<h3 style="flex: 1 1 100%; margin: 0;">Your Transactions</h3>
+					<div class="transaction-history-toolbar">
+						<label class="action-field">
+							<span>Account</span>
+							<select id="accountSelect" aria-label="Select account">
+								<option value="">-- Select Account --</option>
+							</select>
+						</label>
+						<label class="action-field">
+							<span>Search</span>
+							<input id="searchInput" type="search" placeholder="Search ID, customer, amount, type" aria-label="Search transactions" />
+						</label>
+						<label class="action-field">
+							<span>Sort</span>
+							<select id="orderSelect" aria-label="Sort order">
+								<option value="DATE_DESC">Newest first</option>
+								<option value="DATE_ASC">Oldest first</option>
+								<option value="AMOUNT_DESC">Amount high to low</option>
+								<option value="AMOUNT_ASC">Amount low to high</option>
+								<option value="FEE_DESC">Fee high to low</option>
+								<option value="FEE_ASC">Fee low to high</option>
+								<option value="NAME_ASC">Customer A-Z</option>
+								<option value="NAME_DESC">Customer Z-A</option>
+							</select>
+						</label>
+						<button id="refreshBtn" class="action-button" type="button">Refresh</button>
+					</div>
+				</div>
+
+				<p id="transactionMeta" class="transaction-meta">Select an account to view transactions.</p>
+
+				<div id="loadingMessage" class="action-status" aria-live="polite" style="margin: 1rem 0;">Loading accounts...</div>
+
+				<div class="table-wrap">
+					<table class="db-table" aria-label="Transaction history">
+						<thead>
+							<tr>
+								<th>Transaction ID</th>
+								<th>Amount</th>
+								<th>Transfer Fee</th>
+								<th>Total Charges</th>
+								<th>Date & Time</th>
+								<th>Method</th>
+								<th>Customer Name</th>
+								<th></th>
+							</tr>
+						</thead>
+						<tbody id="transactionTableBody">
+							<tr>
+								<td colspan="8" style="text-align: center; padding: 2rem; color: #999;">Select an account to view transactions</td>
+							</tr>
+						</tbody>
+					</table>
+				</div>
+
+				<!-- Transaction editor removed to prevent client-side edits/deletes -->
+			</article>
+		</section>
+
+		<div class="footer-strip credits-strip reveal-block" style="--delay: 520ms;">
+			<div class="credits-heading">
+				<img class="credits-icon" src="assets/Icon-Vietcombank.png" alt="Vietcombank icon" />
+				<span class="credits-title">Database Major Assignment 2</span>
+			</div>
+		</div>
+	</div>
+
+	<script>
+		window.addEventListener("load", () => {
+			document.body.classList.add("home-ready");
+
+			const apiBase = window.location.origin.startsWith("http")
+				? `${window.location.origin}/api`
+				: "http://localhost:8080/api";
+
+			const cccd = sessionStorage.getItem("vcbCCCD") || "";
+			const accountSelect = document.getElementById("accountSelect");
+			const orderSelect = document.getElementById("orderSelect");
+			const searchInput = document.getElementById("searchInput");
+			const refreshBtn = document.getElementById("refreshBtn");
+			const transactionMeta = document.getElementById("transactionMeta");
+			const transactionTableBody = document.getElementById("transactionTableBody");
+			const loadingMessage = document.getElementById("loadingMessage");
+			const logoutBtn = document.getElementById("logoutBtn");
+			// Edit/Delete UI removed: editor elements and buttons intentionally omitted
+
+			let allTransactions = [];
+			let selectedTransaction = null;
+
+			const formatCurrency = (value) =>
+				new Intl.NumberFormat("vi-VN", {
+					style: "currency",
+					currency: "VND",
+					maximumFractionDigits: 0
+				}).format(Number(value || 0));
+
+			const formatDateTime = (raw) => {
+				if (!raw) return "-";
+				const dt = new Date(raw);
+				if (Number.isNaN(dt.getTime())) return "-";
+				return dt.toLocaleString("vi-VN", {
+					hour12: false,
+					year: "numeric",
+					month: "2-digit",
+					day: "2-digit",
+					hour: "2-digit",
+					minute: "2-digit"
+				});
+			};
+
+			const escapeHtml = (value) =>
+				String(value ?? "").replace(/[&<>"]|'/g, (character) => ({
+					"&": "&amp;",
+					"<": "&lt;",
+					">": "&gt;",
+					'"': "&quot;",
+					"'": "&#39;"
+				}[character]));
+
+			const setEditorVisible = (visible) => {};
+
+			const updateMeta = (visibleCount, totalCount) => {
+				if (!accountSelect.value) {
+					transactionMeta.textContent = "Select an account to view transactions.";
+					return;
+				}
+				transactionMeta.textContent = `${visibleCount} of ${totalCount} transaction(s) shown for account ${accountSelect.value}.`;
+			};
+
+			const compareNumber = (left, right, direction) => (Number(left || 0) - Number(right || 0)) * direction;
+
+			const getFilteredTransactions = () => {
+				const searchTerm = searchInput.value.trim().toLowerCase();
+				const sortMode = orderSelect.value;
+				let rows = [...allTransactions];
+
+				if (searchTerm) {
+					rows = rows.filter((transaction) => {
+						const haystack = [
+							transaction.Ma_giao_dich,
+							transaction.So_tai_khoan,
+							transaction.So_tai_khoan_gui,
+							transaction.So_tai_khoan_nhan,
+							transaction.Ten_khach_hang,
+							transaction.Hinh_thuc_nhan,
+							transaction.Ten_khuyen_mai,
+							transaction.Loai_hoa_don,
+							transaction.Ma_hoa_don,
+							transaction.So_tien,
+							transaction.Phi_chuyen_tien
+						]
+							.join(" ")
+							.toLowerCase();
+						return haystack.includes(searchTerm);
+					});
+				}
+
+				switch (sortMode) {
+					case "AMOUNT_DESC":
+						rows.sort((left, right) => compareNumber(right.So_tien, left.So_tien, 1));
+						break;
+					case "AMOUNT_ASC":
+						rows.sort((left, right) => compareNumber(left.So_tien, right.So_tien, 1));
+						break;
+					case "FEE_DESC":
+						rows.sort((left, right) => compareNumber(right.Phi_chuyen_tien, left.Phi_chuyen_tien, 1));
+						break;
+					case "FEE_ASC":
+						rows.sort((left, right) => compareNumber(left.Phi_chuyen_tien, right.Phi_chuyen_tien, 1));
+						break;
+					case "NAME_ASC":
+						rows.sort((left, right) => String(left.Ten_khach_hang || "").localeCompare(String(right.Ten_khach_hang || ""), "vi"));
+						break;
+					case "NAME_DESC":
+						rows.sort((left, right) => String(right.Ten_khach_hang || "").localeCompare(String(left.Ten_khach_hang || ""), "vi"));
+						break;
+					default:
+						break;
+				}
+
+				return rows;
+			};
+
+			const renderTransactions = () => {
+				const rows = getFilteredTransactions();
+				updateMeta(rows.length, allTransactions.length);
+
+				if (rows.length === 0) {
+					transactionTableBody.innerHTML =
+						'<tr><td colspan="8" style="text-align: center; padding: 2rem; color: #999;">No transactions found</td></tr>';
+					return;
+				}
+
+				transactionTableBody.innerHTML = rows
+					.map(
+						(txn) => `
+						<tr>
+							<td><strong>${escapeHtml(txn.Ma_giao_dich || "-")}</strong></td>
+							<td>${formatCurrency(txn.So_tien)}</td>
+							<td>${formatCurrency(txn.Phi_chuyen_tien)}</td>
+							<td>${formatCurrency(txn.Tong_chi_phi)}</td>
+							<td>${escapeHtml(formatDateTime(txn.Ngay_gio))}</td>
+							<td>${escapeHtml(txn.Hinh_thuc_nhan || "-")}</td>
+							<td>${escapeHtml(txn.Ten_khach_hang || "-")}</td>
+							<td></td>
+						</tr>
+						`
+					)
+					.join("");
+			};
+
+			const openEditor = (transaction) => {};
+
+			const loadTransactions = async () => {
+				const accountNumber = accountSelect.value;
+				const sortMode = orderSelect.value;
+
+				if (!accountNumber) {
+					allTransactions = [];
+					transactionTableBody.innerHTML =
+						'<tr><td colspan="8" style="text-align: center; padding: 2rem; color: #999;">Select an account to view transactions</td></tr>';
+					transactionMeta.textContent = "Select an account to view transactions.";
+					setEditorVisible(false);
+					return;
+				}
+
+				try {
+					loadingMessage.textContent = "Loading transactions...";
+					const order = sortMode === "DATE_ASC" ? "ASC" : "DESC";
+					const response = await fetch(
+						`${apiBase}/accounts/${encodeURIComponent(accountNumber)}/transactions?order=${order}`
+					);
+
+					if (!response.ok) {
+						if (response.status === 401) invalidateSession();
+						const errorData = await response.json().catch(() => ({}));
+						loadingMessage.textContent = `Failed to load transactions: ${errorData.message || response.statusText}`;
+						return;
+					}
+
+					allTransactions = await response.json();
+					loadingMessage.textContent = allTransactions.length > 0 ? "" : "No transactions found";
+					renderTransactions();
+				} catch (error) {
+					loadingMessage.textContent = "Error loading transactions: " + error.message;
+				}
+			};
+
+			const saveTransaction = async () => {
+				return;
+			};
+
+			const invalidateSession = () => {
+				window.VCBSessionWatchdog.clearCustomerSession();
+				window.location.replace("index.html");
+			};
+
+			logoutBtn.addEventListener("click", () => {
+				window.VCBSessionWatchdog.clearCustomerSession();
+				window.location.replace("index.html");
+			});
+
+			// Load accounts
+			const loadAccounts = async () => {
+				try {
+					const response = await fetch(`${apiBase}/accounts?cccd=${encodeURIComponent(cccd)}`);
+					if (!response.ok) {
+						if (response.status === 401) invalidateSession();
+						loadingMessage.textContent = "Failed to load accounts";
+						return;
+					}
+
+					const accounts = await response.json();
+					accountSelect.innerHTML = '<option value="">-- Select Account --</option>';
+
+					if (Array.isArray(accounts) && accounts.length > 0) {
+						accounts.forEach((account) => {
+							const option = document.createElement("option");
+							option.value = account.So_tai_khoan;
+							option.textContent = `${account.So_tai_khoan} - ${account.Ten_khach_hang}`;
+							accountSelect.appendChild(option);
+						});
+						loadingMessage.textContent = "Select an account to view transactions";
+					} else {
+						loadingMessage.textContent = "No accounts found";
+					}
+				} catch (error) {
+					loadingMessage.textContent = "Error loading accounts: " + error.message;
+				}
+			};
+
+			accountSelect.addEventListener("change", () => {
+				searchInput.value = "";
+				setEditorVisible(false);
+				loadTransactions();
+			});
+			orderSelect.addEventListener("change", loadTransactions);
+			searchInput.addEventListener("input", renderTransactions);
+			refreshBtn.addEventListener("click", loadTransactions);
+			transactionTableBody.addEventListener("click", (event) => {
+			});
+
+			loadAccounts();
+		});
+	</script>
+</body>
+</html>

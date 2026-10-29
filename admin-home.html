@@ -1,0 +1,850 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8" />
+	<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+	<title>Vietcombank | Admin Home</title>
+	<link rel="preconnect" href="https://fonts.googleapis.com" />
+	<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+	<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=Manrope:wght@500;700;800&display=swap" rel="stylesheet" />
+	<link rel="stylesheet" href="styles.css" />
+	<script src="auth-watchdog.js"></script>
+	<script>
+		if (sessionStorage.getItem("vcbAdminAuthenticated") !== "true") {
+			location.replace("admin-login.html");
+		}
+	</script>
+</head>
+<body class="admin-dark-page">
+	<main class="admin-home-shell">
+		<header class="admin-home-topbar">
+			<div>
+				<p class="admin-kicker">Vietcombank Admin Console</p>
+				<h1>Welcome, <span id="adminWelcomeName">Administrator</span></h1>
+				<p class="admin-desc">Search customer profiles by full name, account number, or CCCD.</p>
+			</div>
+			<div class="admin-home-actions">
+				<a href="admin-loan-summary.html">Loan Summary</a>
+				<a href="create-deposit.html">Deposit console</a>
+				<button id="openAdminPersonalInfoBtn" type="button">Personal info</button>
+				<button id="adminLogoutBtn" type="button">Logout</button>
+			</div>
+		</header>
+
+		<section class="admin-console-card">
+			<form id="adminSearchForm" class="admin-search-form" autocomplete="off">
+				<input id="adminSearchInput" type="text" placeholder="Type customer name, account number, or CCCD" required />
+				<button type="submit">Search</button>
+			</form>
+			<p id="adminSearchStatus" class="admin-status" aria-live="polite"></p>
+
+			<div class="admin-table-wrap">
+				<table class="admin-table" aria-label="Admin customer search results">
+					<thead>
+						<tr>
+							<th>Customer name</th>
+							<th>Account number</th>
+							<th>CCCD</th>
+							<th>Status</th>
+							<th>Type</th>
+							<th>Balance</th>
+							<th>Limit</th>
+							<th>Phones</th>
+							<th>Action</th>
+						</tr>
+					</thead>
+					<tbody id="adminSearchRows"></tbody>
+				</table>
+			</div>
+		</section>
+
+		<section class="admin-console-card" id="loanManagementCard" style="border-top: 4px solid #0066cc; box-shadow: 0 2px 12px rgba(0,0,0,0.15);">
+			<div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.5rem; padding-bottom: 1rem; border-bottom: 2px solid #e2e8f0;">
+				<div>
+					<h3 style="margin: 0; font-size: 1.25rem; color: white; font-weight: 700;">💳 Loan Management</h3>
+					<p style="color: white; margin: 0.4rem 0 0; font-size: 0.9rem;">Load, update, or delete loans from the admin console</p>
+				</div>
+			</div>
+			<div class="admin-search-form" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 1rem; margin-bottom: 1.5rem;">
+				<label>
+					<span style="font-weight: 600; color: white; font-size: 0.9rem;">Loan ID</span>
+					<input id="adminLoanId" type="text" placeholder="KV00000000" style="padding: 0.6rem; border: 1px solid rgba(95, 124, 160, 0.42); border-radius: 4px; font-size: 0.95rem; background: rgba(12, 20, 30, 0.94); color: #d9e8ff;" />
+				</label>
+				<label>
+					<span style="font-weight: 600; color: white; font-size: 0.9rem;">Interest Rate</span>
+					<input id="adminInterestRate" type="number" step="0.0001" min="0" max="0.2" placeholder="0.01" style="padding: 0.6rem; border: 1px solid rgba(95, 124, 160, 0.42); border-radius: 4px; font-size: 0.95rem; background: rgba(12, 20, 30, 0.94); color: #d9e8ff;" />
+				</label>
+				<label>
+					<span style="font-weight: 600; color: white; font-size: 0.9rem;">Term (months)</span>
+					<input id="adminTermMonths" type="number" min="1" placeholder="60" style="padding: 0.6rem; border: 1px solid rgba(95, 124, 160, 0.42); border-radius: 4px; font-size: 0.95rem; background: rgba(12, 20, 30, 0.94); color: #d9e8ff;" />
+				</label>
+				<label>
+					<span style="font-weight: 600; color: white; font-size: 0.9rem;">Principal Cycle</span>
+					<input id="adminPrincipalCycle" type="number" min="1" placeholder="12" style="padding: 0.6rem; border: 1px solid rgba(95, 124, 160, 0.42); border-radius: 4px; font-size: 0.95rem; background: rgba(12, 20, 30, 0.94); color: #d9e8ff;" />
+				</label>
+				<label>
+					<span style="font-weight: 600; color: white; font-size: 0.9rem;">Status</span>
+					<select id="adminLoanStatusSelect" style="padding: 0.6rem; border: 1px solid rgba(95, 124, 160, 0.42); border-radius: 4px; font-size: 0.95rem; background: rgba(12, 20, 30, 0.94); color: #d9e8ff;">
+						<option value="">Keep current</option>
+						<option value="Hoat_dong">🟢 Active</option>
+						<option value="Qua_han">🟡 Overdue</option>
+						<option value="Da_thanh_toan">🔵 Paid Off</option>
+					</select>
+				</label>
+			</div>
+			<div style="display: flex; gap: 0.6rem; flex-wrap: wrap; margin-bottom: 1rem;">
+				<button type="button" class="admin-toggle-btn safe" id="loadLoanBtn" style="border: 0; border-radius: 12px; padding: 12px 14px; font: inherit; font-weight: 800; cursor: pointer; color: #04131a; background: linear-gradient(120deg, #38c7b5, #4fb4ff); box-shadow: 0 14px 30px rgba(12, 46, 82, 0.34); transition: transform 180ms ease, box-shadow 180ms ease;">Load Loan</button>
+				<button type="button" class="admin-toggle-btn safe" id="updateLoanBtn" style="border: 0; border-radius: 12px; padding: 12px 14px; font: inherit; font-weight: 800; cursor: pointer; color: #04131a; background: linear-gradient(120deg, #38c7b5, #4fb4ff); box-shadow: 0 14px 30px rgba(12, 46, 82, 0.34); transition: transform 180ms ease, box-shadow 180ms ease;">Update</button>
+				<button type="button" class="admin-toggle-btn safe" id="deleteLoanBtn" style="border: 0; border-radius: 12px; padding: 12px 14px; font: inherit; font-weight: 800; cursor: pointer; color: #04131a; background: linear-gradient(120deg, #38c7b5, #4fb4ff); box-shadow: 0 14px 30px rgba(12, 46, 82, 0.34); transition: transform 180ms ease, box-shadow 180ms ease;">Delete</button>
+				<button type="button" class="admin-toggle-btn safe" id="clearLoanFormBtn" style="border: 0; border-radius: 12px; padding: 12px 14px; font: inherit; font-weight: 800; cursor: pointer; color: #04131a; background: linear-gradient(120deg, #38c7b5, #4fb4ff); box-shadow: 0 14px 30px rgba(12, 46, 82, 0.34); transition: transform 180ms ease, box-shadow 180ms ease;">Clear</button>
+			</div>
+			<p id="loanManagementStatus" class="admin-status" aria-live="polite" style="margin: 0; padding: 0.2rem; border-radius: 2px; display: none; font-weight: 500;"></p>
+			<style>
+				#loadLoanBtn:hover { transform: translateY(-2px); box-shadow: 0 18px 34px rgba(12, 46, 82, 0.38); }
+				#updateLoanBtn:hover { transform: translateY(-2px); box-shadow: 0 18px 34px rgba(12, 46, 82, 0.38); }
+				#deleteLoanBtn:hover { transform: translateY(-2px); box-shadow: 0 18px 34px rgba(12, 46, 82, 0.38); }
+				#clearLoanFormBtn:hover { transform: translateY(-2px); box-shadow: 0 18px 34px rgba(12, 46, 82, 0.38); }
+				#loanManagementStatus.ok { background: transparent; color: #74e7b0; font-weight: 700; }
+				#loanManagementStatus.error { background: transparent; color: #f99f9f; font-weight: 700; }
+				#adminLoanId:focus, #adminInterestRate:focus, #adminTermMonths:focus, #adminPrincipalCycle:focus, #adminLoanStatusSelect:focus {
+					outline: none;
+					border-color: rgba(91, 173, 255, 0.8);
+					box-shadow: 0 0 0 3px rgba(91, 173, 255, 0.22);
+				}
+			</style>
+		</section>
+	</main>
+
+	<div class="modal-backdrop" id="adminPersonalInfoModal" aria-hidden="true">
+		<div class="modal-shell" role="dialog" aria-modal="true" aria-labelledby="adminPersonalInfoTitle">
+			<div class="modal-head">
+				<h3 id="adminPersonalInfoTitle">Admin personal information</h3>
+				<button class="modal-close" id="closeAdminPersonalInfoBtn" type="button" aria-label="Close">x</button>
+			</div>
+			<div class="modal-body info-list">
+				<div class="info-item"><span>Full name</span><strong id="apiFullName">-</strong></div>
+				<div class="info-item"><span>Username</span><strong id="apiUsername">-</strong></div>
+				<div class="info-item"><span>Admin code</span><strong id="apiMaSo">-</strong></div>
+				<div class="info-item"><span>CCCD</span><strong id="apiCccd">-</strong></div>
+				<div class="info-item"><span>Sex</span><strong id="apiGender">-</strong></div>
+				<div class="info-item"><span>Nationality</span><strong id="apiNationality">-</strong></div>
+				<div class="info-item"><span>Date of birth</span><strong id="apiDob">-</strong></div>
+				<div class="info-item"><span>Phone number</span><strong id="apiPhones">-</strong></div>
+				<div class="info-item"><span>Email</span><strong id="apiEmails">-</strong></div>
+			</div>
+		</div>
+	</div>
+
+	<div class="modal-backdrop" id="deleteAccountModal" aria-hidden="true">
+		<div class="modal-shell" role="dialog" aria-modal="true" aria-labelledby="deleteAccountTitle">
+			<div class="modal-head">
+				<h3 id="deleteAccountTitle">Delete Account</h3>
+				<button class="modal-close" id="closeDeleteAccountBtn" type="button" aria-label="Close">x</button>
+			</div>
+			<div class="modal-body">
+				<p style="margin-bottom: 1.5rem; color: #f44336; font-weight: 600;">
+					⚠️ WARNING: This action cannot be undone!
+				</p>
+				<div class="info-list">
+					<div class="info-item">
+						<span>Account Number</span>
+						<strong id="deleteAccountNumber">-</strong>
+					</div>
+					<div class="info-item">
+						<span>Customer Name</span>
+						<strong id="deleteAccountName">-</strong>
+					</div>
+					<div class="info-item">
+						<span>Current Balance</span>
+						<strong id="deleteAccountBalance">-</strong>
+					</div>
+				</div>
+
+				<div style="background: #fff3cd; border: 1px solid #ffc107; border-radius: 4px; padding: 1rem; margin: 1.5rem 0; font-size: 0.9rem;">
+					<strong>Requirements to delete account:</strong>
+					<ul style="margin: 0.5rem 0 0 1.5rem; padding: 0;">
+						<li>Account balance must be exactly zero</li>
+						<li>No active or overdue loans</li>
+						<li>No unpaid bills</li>
+						<li>All linked cards will be removed</li>
+					</ul>
+				</div>
+
+				<form id="deleteConfirmForm" style="margin-top: 1.5rem;">
+					<label class="action-field">
+						<input type="checkbox" id="deleteConfirmCheckbox" required />
+						I understand this will permanently delete the account and all its data
+					</label>
+					<p class="action-status" id="deleteAccountStatus" aria-live="polite"></p>
+					<div style="display: flex; gap: 1rem; margin-top: 1rem;">
+						<button class="action-button" type="submit" id="deleteConfirmBtn" style="background: #f44336;">
+							Delete Account Permanently
+						</button>
+						<button class="action-button" type="button" id="deleteAbortBtn" style="background: #999;">
+							Cancel
+						</button>
+					</div>
+				</form>
+			</div>
+		</div>
+	</div>
+
+	<script>
+		const apiBase = window.location.origin.startsWith("http")
+			? `${window.location.origin}/api`
+			: "http://localhost:8080/api";
+
+		const adminToken = sessionStorage.getItem("vcbAdminToken") || "";
+		const adminName = sessionStorage.getItem("vcbAdminName") || sessionStorage.getItem("vcbAdminUser") || "Administrator";
+		const adminWelcomeName = document.getElementById("adminWelcomeName");
+		const openAdminPersonalInfoBtn = document.getElementById("openAdminPersonalInfoBtn");
+		const adminPersonalInfoModal = document.getElementById("adminPersonalInfoModal");
+		const closeAdminPersonalInfoBtn = document.getElementById("closeAdminPersonalInfoBtn");
+		const apiFullName = document.getElementById("apiFullName");
+		const apiUsername = document.getElementById("apiUsername");
+		const apiMaSo = document.getElementById("apiMaSo");
+		const apiCccd = document.getElementById("apiCccd");
+		const apiGender = document.getElementById("apiGender");
+		const apiNationality = document.getElementById("apiNationality");
+		const apiDob = document.getElementById("apiDob");
+		const apiPhones = document.getElementById("apiPhones");
+		const apiEmails = document.getElementById("apiEmails");
+		const adminLogoutBtn = document.getElementById("adminLogoutBtn");
+		const adminSearchForm = document.getElementById("adminSearchForm");
+		const adminSearchInput = document.getElementById("adminSearchInput");
+		const adminSearchRows = document.getElementById("adminSearchRows");
+		const adminSearchStatus = document.getElementById("adminSearchStatus");
+		let adminPromotionOptionsHtml = '<option value="">No promotion available</option>';
+		const adminLoanId = document.getElementById("adminLoanId");
+		const adminInterestRate = document.getElementById("adminInterestRate");
+		const adminTermMonths = document.getElementById("adminTermMonths");
+		const adminPrincipalCycle = document.getElementById("adminPrincipalCycle");
+		const adminLoanStatusSelect = document.getElementById("adminLoanStatusSelect");
+		const loanManagementStatus = document.getElementById("loanManagementStatus");
+		const loadLoanBtn = document.getElementById("loadLoanBtn");
+		const updateLoanBtn = document.getElementById("updateLoanBtn");
+		const deleteLoanBtn = document.getElementById("deleteLoanBtn");
+		const clearLoanFormBtn = document.getElementById("clearLoanFormBtn");
+
+		adminWelcomeName.textContent = adminName;
+
+		const setAdminPersonalInfo = (profile) => {
+			apiFullName.textContent = profile.fullName || "-";
+			apiUsername.textContent = profile.username || "-";
+			apiMaSo.textContent = profile.maSo || "-";
+			apiCccd.textContent = profile.cccd || "-";
+			apiGender.textContent = profile.gender || "-";
+			apiNationality.textContent = profile.nationality || "-";
+			apiDob.textContent = profile.dob || "-";
+			apiPhones.textContent = Array.isArray(profile.phones) && profile.phones.length ? profile.phones.join(", ") : "-";
+			apiEmails.textContent = Array.isArray(profile.emails) && profile.emails.length ? profile.emails.join(", ") : "-";
+		};
+
+		const showAdminPersonalInfoModal = () => {
+			adminPersonalInfoModal.classList.add("open");
+			adminPersonalInfoModal.setAttribute("aria-hidden", "false");
+		};
+
+		const closeAdminPersonalInfoModal = () => {
+			adminPersonalInfoModal.classList.remove("open");
+			adminPersonalInfoModal.setAttribute("aria-hidden", "true");
+		};
+
+		const loadAdminPersonalInfo = async () => {
+			try {
+				const response = await fetch(`${apiBase}/admin/personal-info`, {
+					headers: {
+						Authorization: `Bearer ${adminToken}`
+					}
+				});
+				const payload = await response.json();
+
+				if (!response.ok) {
+					if (response.status === 401) {
+						clearAdminSession();
+						window.location.replace("admin-login.html");
+					}
+					return false;
+				}
+
+				setAdminPersonalInfo(payload);
+				return true;
+			} catch (error) {
+				return false;
+			}
+		};
+
+		const clearAdminSession = () => {
+			window.VCBSessionWatchdog.clearAdminSession();
+		};
+
+		const invalidateAdminSession = () => {
+			clearAdminSession();
+			window.location.replace("admin-login.html");
+		};
+
+		window.VCBSessionWatchdog.start({
+			intervalMs: 15000,
+			onInvalid: invalidateAdminSession,
+			validator: async () => {
+				if (!adminToken) {
+					return false;
+				}
+
+				const healthResponse = await window.VCBSessionWatchdog.fetchWithTimeout(`${apiBase}/health`, {
+					cache: "no-store"
+				});
+				if (!healthResponse.ok) {
+					return false;
+				}
+
+				const profileResponse = await window.VCBSessionWatchdog.fetchWithTimeout(`${apiBase}/admin/personal-info`, {
+					headers: {
+						Authorization: `Bearer ${adminToken}`
+					},
+					cache: "no-store"
+				});
+
+				return profileResponse.ok;
+			}
+		});
+
+		openAdminPersonalInfoBtn.addEventListener("click", async () => {
+			const ok = await loadAdminPersonalInfo();
+			if (ok) {
+				showAdminPersonalInfoModal();
+			}
+		});
+
+		closeAdminPersonalInfoBtn.addEventListener("click", closeAdminPersonalInfoModal);
+
+		adminPersonalInfoModal.addEventListener("click", (event) => {
+			if (event.target === adminPersonalInfoModal) {
+				closeAdminPersonalInfoModal();
+			}
+		});
+
+		const getLoanManagementHeaders = () => ({
+			Authorization: `Bearer ${adminToken}`
+		});
+
+		const showLoanManagementStatus = (message, isOk = false) => {
+			loanManagementStatus.textContent = message;
+			loanManagementStatus.style.display = "block";
+			loanManagementStatus.classList.toggle("ok", isOk);
+			loanManagementStatus.classList.toggle("error", !isOk);
+		};
+
+		const clearLoanManagementForm = () => {
+			adminLoanId.value = "";
+			adminInterestRate.value = "";
+			adminTermMonths.value = "";
+			adminPrincipalCycle.value = "";
+			adminLoanStatusSelect.value = "";
+			loanManagementStatus.textContent = "";
+			loanManagementStatus.classList.remove("ok");
+			loanManagementStatus.classList.remove("error");
+			loanManagementStatus.style.display = "none";
+		};
+
+		const loadLoanManagementLoan = async () => {
+			const loanId = adminLoanId.value.trim();
+			if (!loanId) {
+				showLoanManagementStatus("Loan ID is required.", false);
+				return;
+			}
+
+			try {
+				const response = await fetch(`${apiBase}/admin/loans/${encodeURIComponent(loanId)}`, {
+					headers: getLoanManagementHeaders()
+				});
+				const payload = await response.json();
+
+				if (!response.ok) {
+					showLoanManagementStatus(payload.message || "Failed to load loan.", false);
+					if (response.status === 401) {
+						clearAdminSession();
+						window.location.replace("admin-login.html");
+					}
+					return;
+				}
+
+				adminInterestRate.value = payload.interestRate ?? "";
+				adminTermMonths.value = payload.termMonths ?? "";
+				adminPrincipalCycle.value = payload.principalCycle ?? "";
+				adminLoanStatusSelect.value = payload.status || "";
+				showLoanManagementStatus(
+					`Loaded ${payload.loanId}${payload.customerName ? ` for ${payload.customerName}` : ""}.`,
+					true
+				);
+			} catch (error) {
+				showLoanManagementStatus("Cannot connect to API. Start backend server and try again.", false);
+			}
+		};
+
+		const updateLoanManagementLoan = async () => {
+			const loanId = adminLoanId.value.trim();
+			if (!loanId) {
+				showLoanManagementStatus("Loan ID is required.", false);
+				return;
+			}
+
+			updateLoanBtn.disabled = true;
+			try {
+				const response = await fetch(`${apiBase}/admin/loans/update`, {
+					method: "POST",
+					headers: {
+						"Content-Type": "application/json",
+						...getLoanManagementHeaders()
+					},
+					body: JSON.stringify({
+						loanId,
+						interestRate: adminInterestRate.value.trim() || null,
+						termMonths: adminTermMonths.value.trim() || null,
+						principalCycle: adminPrincipalCycle.value.trim() || null,
+						status: adminLoanStatusSelect.value || null
+					})
+				});
+				const payload = await response.json();
+
+				if (!response.ok) {
+					showLoanManagementStatus(payload.message || "Failed to update loan.", false);
+					if (response.status === 401) {
+						clearAdminSession();
+						window.location.replace("admin-login.html");
+					}
+					return;
+				}
+
+				showLoanManagementStatus(payload.message || `Loan ${loanId} updated successfully.`, true);
+				await loadLoanManagementLoan();
+			} catch (error) {
+				showLoanManagementStatus("Cannot connect to API. Start backend server and try again.", false);
+			} finally {
+				updateLoanBtn.disabled = false;
+			}
+		};
+
+		const deleteLoanManagementLoan = async () => {
+			const loanId = adminLoanId.value.trim();
+			if (!loanId) {
+				showLoanManagementStatus("Loan ID is required.", false);
+				return;
+			}
+
+			const reason = window.prompt(`Enter delete reason for ${loanId}:`);
+			if (reason === null) {
+				return;
+			}
+
+			const trimmedReason = reason.trim();
+			if (!trimmedReason) {
+				showLoanManagementStatus("Delete reason is required.", false);
+				return;
+			}
+
+			try {
+				const response = await fetch(`${apiBase}/admin/loans/delete`, {
+					method: "DELETE",
+					headers: {
+						"Content-Type": "application/json",
+						...getLoanManagementHeaders()
+					},
+					body: JSON.stringify({ loanId, reason: trimmedReason })
+				});
+				const payload = await response.json();
+
+				if (!response.ok) {
+					showLoanManagementStatus(payload.message || "Failed to delete loan.", false);
+					if (response.status === 401) {
+						clearAdminSession();
+						window.location.replace("admin-login.html");
+					}
+					return;
+				}
+
+				showLoanManagementStatus(payload.message || `Loan ${loanId} deleted successfully.`, true);
+				clearLoanManagementForm();
+			} catch (error) {
+				showLoanManagementStatus("Cannot connect to API. Start backend server and try again.", false);
+			}
+		};
+
+		// Delete account modal handlers
+		const deleteAccountModal = document.getElementById("deleteAccountModal");
+		const closeDeleteAccountBtn = document.getElementById("closeDeleteAccountBtn");
+		const deleteAbortBtn = document.getElementById("deleteAbortBtn");
+		const deleteConfirmForm = document.getElementById("deleteConfirmForm");
+		const deleteConfirmCheckbox = document.getElementById("deleteConfirmCheckbox");
+		const deleteConfirmBtn = document.getElementById("deleteConfirmBtn");
+		const deleteAccountStatus = document.getElementById("deleteAccountStatus");
+		const deleteAccountNumber = document.getElementById("deleteAccountNumber");
+		const deleteAccountName = document.getElementById("deleteAccountName");
+		const deleteAccountBalance = document.getElementById("deleteAccountBalance");
+
+		const showDeleteAccountModal = (accountData) => {
+			deleteAccountNumber.textContent = accountData.So_tai_khoan || "-";
+			deleteAccountName.textContent = accountData.Ten_khach_hang || "-";
+			deleteAccountBalance.textContent = formatMoney(accountData.So_du) + " VND";
+			deleteConfirmCheckbox.checked = false;
+			deleteAccountStatus.textContent = "";
+			deleteConfirmBtn.disabled = false;
+			deleteAccountModal.classList.add("open");
+			deleteAccountModal.setAttribute("aria-hidden", "false");
+		};
+
+		const closeDeleteAccountModal = () => {
+			deleteAccountModal.classList.remove("open");
+			deleteAccountModal.setAttribute("aria-hidden", "true");
+		};
+
+		closeDeleteAccountBtn.addEventListener("click", closeDeleteAccountModal);
+		deleteAbortBtn.addEventListener("click", closeDeleteAccountModal);
+
+		deleteAccountModal.addEventListener("click", (event) => {
+			if (event.target === deleteAccountModal) {
+				closeDeleteAccountModal();
+			}
+		});
+
+		deleteConfirmForm.addEventListener("submit", async (e) => {
+			e.preventDefault();
+
+			const accountNumber = deleteAccountNumber.textContent;
+			if (!accountNumber || accountNumber === "-") {
+				deleteAccountStatus.textContent = "Error: Invalid account number.";
+				return;
+			}
+
+			if (!deleteConfirmCheckbox.checked) {
+				deleteAccountStatus.textContent = "Please confirm you understand the consequences.";
+				return;
+			}
+
+			deleteConfirmBtn.disabled = true;
+			deleteAccountStatus.textContent = "Deleting account...";
+
+			try {
+				const response = await fetch(
+					`${apiBase}/admin/accounts/${encodeURIComponent(accountNumber)}/delete`,
+					{
+						method: "DELETE",
+						headers: {
+							Authorization: `Bearer ${adminToken}`
+						}
+					}
+				);
+
+				const payload = await response.json();
+
+				if (!response.ok) {
+					deleteAccountStatus.textContent = `Error: ${payload.message || "Failed to delete account"}`;
+					deleteConfirmBtn.disabled = false;
+					if (response.status === 401) {
+						clearAdminSession();
+						window.location.replace("admin-login.html");
+					}
+					return;
+				}
+
+				deleteAccountStatus.textContent = "✓ Account deleted successfully!";
+				deleteAccountStatus.style.color = "#4caf50";
+				setTimeout(() => {
+					closeDeleteAccountModal();
+					adminSearchForm.dispatchEvent(new Event("submit"));
+				}, 1500);
+			} catch (error) {
+				deleteAccountStatus.textContent = `Error: ${error.message}`;
+				deleteConfirmBtn.disabled = false;
+			}
+		});
+
+		adminLogoutBtn.addEventListener("click", () => {
+			clearAdminSession();
+			window.location.replace("index.html");
+		});
+
+		const formatMoney = (value) => new Intl.NumberFormat("vi-VN", { maximumFractionDigits: 0 }).format(Number(value || 0));
+
+		const setSearchStatus = (message, isOk = false) => {
+			adminSearchStatus.textContent = message;
+			adminSearchStatus.classList.toggle("ok", isOk);
+		};
+
+		const getStatusClass = (status) => (status === "Hoat_dong" ? "ok" : "off");
+
+		const loadAdminPromotions = async () => {
+			try {
+				const response = await fetch(`${apiBase}/admin/promotions`, {
+					headers: {
+						Authorization: `Bearer ${adminToken}`
+					}
+				});
+				const payload = await response.json();
+
+				if (!response.ok) {
+					if (response.status === 401) {
+						clearAdminSession();
+						window.location.replace("admin-login.html");
+					}
+					adminPromotionOptionsHtml = '<option value="">No promotion available</option>';
+					return;
+				}
+
+				if (!Array.isArray(payload) || !payload.length) {
+					adminPromotionOptionsHtml = '<option value="">No promotion available</option>';
+					return;
+				}
+
+				adminPromotionOptionsHtml = [
+					'<option value="">Select promotion</option>',
+					...payload.map((item) => {
+						const minAmount = formatMoney(item.So_tien_toi_thieu);
+						const title = item.Ten_chuong_trinh || item.Ma;
+									const remaining = Number(item.So_luong || 0);
+									return `<option value="${item.Ma}">${item.Ma} - ${title} (min ${minAmount} VND, left ${remaining})</option>`;
+					})
+				].join("");
+			} catch (error) {
+				adminPromotionOptionsHtml = '<option value="">No promotion available</option>';
+			}
+		};
+
+		const renderSearchRows = (rows) => {
+			adminSearchRows.innerHTML = rows.map((row) => {
+				const status = row.Trang_thai || "-";
+				const isActive = status === "Hoat_dong";
+				const isInactive = status === "Ngung_kich_hoat";
+				const actionLabel = isActive ? "Deactivate" : (isInactive ? "Activate" : "N/A");
+				const actionType = isActive ? "deactivate" : (isInactive ? "activate" : "none");
+				const actionClass = isActive ? "danger" : "safe";
+
+				return `
+					<tr data-account="${row.So_tai_khoan || ""}">
+						<td>${row.Ten_khach_hang || "-"}</td>
+						<td>${row.So_tai_khoan || "-"}</td>
+						<td>${row.CCCD || "-"}</td>
+						<td class="admin-status-cell">
+							<span class="status-badge admin-status-badge ${getStatusClass(status)}">${status}</span>
+						</td>
+						<td>${row.account_type === 'savings' ? 'Savings' : (row.account_type === 'payment' ? 'Payment' : (row.account_type || '-'))}</td>
+						<td>${formatMoney(row.So_du)} VND</td>
+						<td>${formatMoney(row.Han_muc)} VND</td>
+						<td>${row.phones || "-"}</td>
+						<td>
+							<div class="admin-action-stack">
+								<button class="admin-toggle-btn ${actionClass}" type="button" data-account="${row.So_tai_khoan || ""}" data-action="${actionType}" ${actionType === "none" ? "disabled" : ""}>
+									${actionLabel}
+								</button>
+								<button class="admin-toggle-btn danger admin-delete-btn" type="button" data-account="${row.So_tai_khoan || ""}" title="Delete account">
+									Delete
+								</button>
+								<div class="admin-promo-row">
+									<select class="admin-promo-select" data-account="${row.So_tai_khoan || ""}">
+										${adminPromotionOptionsHtml}
+									</select>
+									<button class="admin-toggle-btn safe admin-promo-assign-btn" type="button" data-account="${row.So_tai_khoan || ""}">
+										Give promo
+									</button>
+								</div>
+							</div>
+						</td>
+					</tr>
+				`;
+			}).join("");
+		};
+
+		adminSearchRows.addEventListener("click", async (event) => {
+			const target = event.target;
+			if (!(target instanceof HTMLButtonElement) || !target.classList.contains("admin-toggle-btn")) {
+				return;
+			}
+
+			if (target.classList.contains("admin-delete-btn")) {
+				const accountNumber = String(target.dataset.account || "").trim();
+				if (!accountNumber) {
+					return;
+				}
+
+				const row = target.closest("tr");
+				if (!row) return;
+
+				const accountData = {
+					So_tai_khoan: accountNumber,
+					Ten_khach_hang: row.cells[0]?.textContent || "-",
+					So_du: row.cells[5]?.textContent?.replace(" VND", "") || "0"
+				};
+
+				showDeleteAccountModal(accountData);
+				return;
+			}
+
+			if (target.classList.contains("admin-promo-assign-btn")) {
+				const accountNumber = String(target.dataset.account || "").trim();
+				if (!accountNumber || target.disabled) {
+					return;
+				}
+
+				const row = target.closest("tr");
+				const selectEl = row ? row.querySelector(".admin-promo-select") : null;
+				const promotionCode = selectEl instanceof HTMLSelectElement ? String(selectEl.value || "").trim() : "";
+				if (!promotionCode) {
+					setSearchStatus("Please select a promotion before assigning.", false);
+					return;
+				}
+
+				target.disabled = true;
+				if (selectEl instanceof HTMLSelectElement) {
+					selectEl.disabled = true;
+				}
+				setSearchStatus("", false);
+
+				try {
+					const response = await fetch(`${apiBase}/admin/promotions/assign`, {
+						method: "POST",
+						headers: {
+							"Content-Type": "application/json",
+							Authorization: `Bearer ${adminToken}`
+						},
+						body: JSON.stringify({ accountNumber, promotionCode })
+					});
+
+					const payload = await response.json();
+					if (!response.ok) {
+						target.disabled = false;
+						if (selectEl instanceof HTMLSelectElement) {
+							selectEl.disabled = false;
+						}
+						setSearchStatus(payload.message || "Promotion assignment failed.", false);
+						if (response.status === 401) {
+							clearAdminSession();
+							window.location.replace("admin-login.html");
+						}
+						return;
+					}
+
+					setSearchStatus(payload.message || "Promotion assigned.", true);
+					if (payload.assignedDate) {
+						setSearchStatus(`${payload.message || "Promotion assigned."} Assigned on ${payload.assignedDate}.`, true);
+					}
+					target.disabled = false;
+					if (selectEl instanceof HTMLSelectElement) {
+						selectEl.disabled = false;
+						selectEl.value = "";
+						const usedOption = selectEl.querySelector(`option[value="${promotionCode}"]`);
+						if (usedOption) {
+							usedOption.remove();
+						}
+					}
+				} catch (error) {
+					target.disabled = false;
+					if (selectEl instanceof HTMLSelectElement) {
+						selectEl.disabled = false;
+					}
+					setSearchStatus("Cannot connect to API. Start backend server and try again.", false);
+				}
+
+				return;
+			}
+
+			const accountNumber = String(target.dataset.account || "").trim();
+			const action = String(target.dataset.action || "").trim();
+			if (!accountNumber || target.disabled || (action !== "deactivate" && action !== "activate")) {
+				return;
+			}
+
+			target.disabled = true;
+			setSearchStatus("", false);
+
+			try {
+				const endpoint = action === "deactivate" ? "deactivate" : "activate";
+				const response = await fetch(`${apiBase}/admin/accounts/${endpoint}`, {
+					method: "POST",
+					headers: {
+						"Content-Type": "application/json",
+						Authorization: `Bearer ${adminToken}`
+					},
+					body: JSON.stringify({ accountNumber })
+				});
+
+				const payload = await response.json();
+
+				if (!response.ok) {
+					target.disabled = false;
+					setSearchStatus(payload.message || "Account status update failed.", false);
+					if (response.status === 401) {
+						clearAdminSession();
+						window.location.replace("admin-login.html");
+					}
+					return;
+				}
+
+				const row = target.closest("tr");
+				const statusCell = row ? row.querySelector(".admin-status-cell") : null;
+				const newStatus = action === "deactivate" ? "Ngung_kich_hoat" : "Hoat_dong";
+				const nextAction = action === "deactivate" ? "activate" : "deactivate";
+				if (statusCell) {
+					statusCell.innerHTML = `<span class="status-badge admin-status-badge ${getStatusClass(newStatus)}">${newStatus}</span>`;
+				}
+
+				target.dataset.action = nextAction;
+				target.textContent = nextAction === "deactivate" ? "Deactivate" : "Activate";
+				target.classList.toggle("danger", nextAction === "deactivate");
+				target.classList.toggle("safe", nextAction === "activate");
+				target.disabled = false;
+				setSearchStatus(payload.message || "Account status updated.", true);
+			} catch (error) {
+				target.disabled = false;
+				setSearchStatus("Cannot connect to API. Start backend server and try again.", false);
+			}
+		});
+
+		loadLoanBtn.addEventListener("click", loadLoanManagementLoan);
+		updateLoanBtn.addEventListener("click", updateLoanManagementLoan);
+		deleteLoanBtn.addEventListener("click", deleteLoanManagementLoan);
+		clearLoanFormBtn.addEventListener("click", clearLoanManagementForm);
+		clearLoanManagementForm();
+
+		adminSearchForm.addEventListener("submit", async (event) => {
+			event.preventDefault();
+			setSearchStatus("", false);
+			adminSearchRows.innerHTML = "";
+
+			const query = adminSearchInput.value.trim();
+			if (!query) {
+				setSearchStatus("Please enter a search value.", false);
+				return;
+			}
+
+			try {
+				await loadAdminPromotions();
+				const response = await fetch(`${apiBase}/admin/customers/search?query=${encodeURIComponent(query)}`, {
+					headers: {
+						Authorization: `Bearer ${adminToken}`
+					}
+				});
+				const payload = await response.json();
+
+				if (!response.ok) {
+					setSearchStatus(payload.message || "Search failed.", false);
+					if (response.status === 401) {
+						clearAdminSession();
+						window.location.replace("admin-login.html");
+					}
+					return;
+				}
+
+				if (!payload.length) {
+					setSearchStatus("No customer matched your query.", false);
+					return;
+				}
+
+				renderSearchRows(payload);
+				setSearchStatus(`Found ${payload.length} record(s).`, true);
+			} catch (error) {
+				setSearchStatus("Cannot connect to API. Start backend server and try again.", false);
+			}
+		});
+	</script>
+</body>
+</html>

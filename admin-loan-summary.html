@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8" />
+	<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+	<title>Vietcombank | Admin Loan Summary</title>
+	<link rel="preconnect" href="https://fonts.googleapis.com" />
+	<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+	<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=Manrope:wght@500;700;800&display=swap" rel="stylesheet" />
+	<link rel="stylesheet" href="styles.css" />
+	<script src="auth-watchdog.js"></script>
+	<script>
+		if (sessionStorage.getItem("vcbAdminAuthenticated") !== "true") {
+			location.replace("admin-login.html");
+		}
+	</script>
+</head>
+<body class="admin-dark-page">
+	<main class="admin-home-shell">
+		<header class="admin-home-topbar">
+			<div>
+				<p class="admin-kicker">Vietcombank Admin Console</p>
+				<h1>Loan Summary Dashboard</h1>
+				<p class="admin-desc">View loan portfolio managed by admin with detailed statistics.</p>
+			</div>
+			<div class="admin-home-actions">
+				<a href="admin-home.html">Back to console</a>
+				<button id="adminLogoutBtn" type="button">Logout</button>
+			</div>
+		</header>
+
+		<section class="admin-console-card">
+			<div class="admin-search-form" style="display: flex; gap: 1rem; align-items: center;">
+				<label for="minAmountInput" style="margin: 0;">
+					Minimum total amount:
+					<input type="number" id="minAmountInput" placeholder="0" value="0" min="0" style="width: 150px;" />
+				</label>
+				<button type="button" id="refreshBtn">Refresh</button>
+			</div>
+			<p id="adminSummaryStatus" class="admin-status" aria-live="polite">Loading loan data...</p>
+
+			<div class="admin-stats-grid">
+				<div class="admin-stat-card">
+					<span class="admin-stat-label">Total Loans</span>
+					<strong class="admin-stat-value" id="statTotalLoans">-</strong>
+				</div>
+				<div class="admin-stat-card">
+					<span class="admin-stat-label">Total Loan Amount</span>
+					<strong class="admin-stat-value" id="statTotalAmount">-</strong>
+				</div>
+				<div class="admin-stat-card">
+					<span class="admin-stat-label">Average Interest Rate</span>
+					<strong class="admin-stat-value" id="statAvgRate">-</strong>
+				</div>
+				<div class="admin-stat-card">
+					<span class="admin-stat-label">Active Loans</span>
+					<strong class="admin-stat-value" id="statActiveLoan">-</strong>
+				</div>
+			</div>
+
+			<div class="admin-table-wrap">
+				<table class="admin-table" aria-label="Admin loan summary">
+					<thead>
+						<tr>
+							<th>Admin Code</th>
+							<th>Full Name</th>
+							<th>Total Loans</th>
+							<th>Total Amount</th>
+							<th>Avg Interest Rate</th>
+							<th>Active Loans</th>
+							<th>Completed Loans</th>
+							<th>Latest Approval</th>
+						</tr>
+					</thead>
+					<tbody id="loanSummaryRows"></tbody>
+				</table>
+			</div>
+		</section>
+	</main>
+
+	<script>
+		const apiBase = window.location.origin.startsWith("http")
+			? `${window.location.origin}/api`
+			: "http://localhost:8080/api";
+
+		const adminToken = sessionStorage.getItem("vcbAdminToken") || "";
+		const minAmountInput = document.getElementById("minAmountInput");
+		const refreshBtn = document.getElementById("refreshBtn");
+		const adminSummaryStatus = document.getElementById("adminSummaryStatus");
+		const adminLogoutBtn = document.getElementById("adminLogoutBtn");
+		const loanSummaryRows = document.getElementById("loanSummaryRows");
+		const statTotalLoans = document.getElementById("statTotalLoans");
+		const statTotalAmount = document.getElementById("statTotalAmount");
+		const statAvgRate = document.getElementById("statAvgRate");
+		const statActiveLoan = document.getElementById("statActiveLoan");
+
+		const getAdminHeaders = () => ({
+			Authorization: `Bearer ${adminToken}`
+		});
+
+		const formatCurrency = (value) =>
+			new Intl.NumberFormat("vi-VN", {
+				style: "currency",
+				currency: "VND",
+				maximumFractionDigits: 0
+			}).format(Number(value || 0));
+
+		const formatRate = (value) => (Number(value || 0) * 100).toFixed(2) + "%";
+
+		const formatDate = (raw) => {
+			if (!raw) return "-";
+			const dt = new Date(raw);
+			if (Number.isNaN(dt.getTime())) return "-";
+			return dt.toLocaleDateString("vi-VN");
+		};
+
+		const clearAdminSession = () => {
+			window.VCBSessionWatchdog.clearAdminSession();
+		};
+
+		const invalidateAdminSession = () => {
+			clearAdminSession();
+			window.location.replace("admin-login.html");
+		};
+
+		adminLogoutBtn.addEventListener("click", () => {
+			clearAdminSession();
+			window.location.replace("admin-login.html");
+		});
+
+		const loadLoanSummary = async () => {
+			try {
+				const minAmount = Number(minAmountInput.value) || 0;
+				adminSummaryStatus.textContent = "Loading loan summary...";
+
+				const response = await fetch(
+					`${apiBase}/admin/loan-summary?min_amount=${minAmount}`,
+					{
+						headers: getAdminHeaders()
+					}
+				);
+
+				if (!response.ok) {
+					if (response.status === 401) {
+						invalidateAdminSession();
+					}
+					const error = await response.json();
+					adminSummaryStatus.textContent = `Error: ${error.message || "Failed to load data"}`;
+					loanSummaryRows.innerHTML = '<tr><td colspan="8" style="text-align: center; padding: 2rem;">No data available</td></tr>';
+					return;
+				}
+
+				const data = await response.json();
+
+				if (!Array.isArray(data) || data.length === 0) {
+					adminSummaryStatus.textContent = "No loan data found for the selected criteria";
+					loanSummaryRows.innerHTML = '<tr><td colspan="8" style="text-align: center; padding: 2rem;">No loans matching the criteria</td></tr>';
+					statTotalLoans.textContent = "0";
+					statTotalAmount.textContent = formatCurrency(0);
+					statAvgRate.textContent = "0%";
+					statActiveLoan.textContent = "0";
+					return;
+				}
+
+				// Calculate totals
+				let totalLoans = 0;
+				let totalAmount = 0;
+				let totalRate = 0;
+				let totalActive = 0;
+
+				data.forEach((row) => {
+					totalLoans += Number(row.So_khoan_vay || 0);
+					totalAmount += Number(row.Tong_tien_vay || 0);
+					totalRate += Number(row.Lai_suat_trung_binh || 0);
+					totalActive += Number(row.So_khoan_dang_hoat_dong || 0);
+				});
+
+				const avgRate = data.length > 0 ? totalRate / data.length : 0;
+
+				// Update statistics
+				statTotalLoans.textContent = totalLoans.toString();
+				statTotalAmount.textContent = formatCurrency(totalAmount);
+				statAvgRate.textContent = formatRate(avgRate);
+				statActiveLoan.textContent = totalActive.toString();
+
+				// Render table
+				loanSummaryRows.innerHTML = data
+					.map(
+						(row) => `
+						<tr>
+							<td>${row.Ma_so || "-"}</td>
+							<td>${[row.Ho || "", row.Ten_lot || "", row.Ten || ""].join(" ").trim() || "-"}</td>
+							<td>${row.So_khoan_vay || 0}</td>
+							<td>${formatCurrency(row.Tong_tien_vay)}</td>
+							<td>${formatRate(row.Lai_suat_trung_binh)}</td>
+							<td>${row.So_khoan_dang_hoat_dong || 0}</td>
+							<td>${row.So_khoan_da_tat_toan || 0}</td>
+							<td>${formatDate(row.Ngay_phe_duyet_gan_nhat)}</td>
+						</tr>
+					`
+					)
+					.join("");
+
+				adminSummaryStatus.textContent = `Showing ${data.length} admin(s) with loan data`;
+			} catch (error) {
+				adminSummaryStatus.textContent = `Error: ${error.message}`;
+			}
+		};
+
+		refreshBtn.addEventListener("click", loadLoanSummary);
+		minAmountInput.addEventListener("change", loadLoanSummary);
+
+		// Load on page load
+		window.addEventListener("load", loadLoanSummary);
+	</script>
+</body>
+</html>
